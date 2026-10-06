@@ -100,9 +100,8 @@ _rl_lock = _threading.Lock()
 
 
 def _client_ip():
-    """Best-effort visitor IP behind Cloudflare / Hugging Face proxies.
-    X-Visitor-IP is set by our own Cloudflare Worker (cloudflare/worker.js)."""
-    return (request.headers.get('X-Visitor-IP')
+    """Best-effort visitor IP behind Cloudflare / Google Cloud Run proxies."""
+    return (request.headers.get('CF-Connecting-IP')
             or (request.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
             or request.remote_addr or '?')
 
