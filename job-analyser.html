@@ -521,6 +521,24 @@
     .jobs-panel { border-right: none; border-bottom: 1px solid var(--border); max-height: 60vh; }
     .right-panel { min-height: 50vh; }
   }
+  /* ── Public demo mode: hide owner-only controls ── */
+  body.public-mode .btn-settings,
+  body.public-mode #settingsModal,
+  body.public-mode #autoBtn,
+  body.public-mode #autoStatus,
+  body.public-mode #tabFavorites,
+  body.public-mode .fav-btn,
+  body.public-mode .hist-fav,
+  body.public-mode .fav-export-bar,
+  body.public-mode #analyzeAllBtn { display: none !important; }
+  .public-banner {
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 6px;
+    padding: 9px 16px; font-size: 0.82rem; line-height: 1.5; text-align: center;
+    color: var(--muted); background: var(--surface2); border-bottom: 1px solid var(--border);
+  }
+  .public-banner b { color: var(--text); }
+  .public-banner a { color: var(--accent); text-decoration: none; }
+  .public-banner a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -633,6 +651,30 @@
 </div>
 
 <script>
+// ─── Server address ──────────────────────────────────────
+// Served by the Flask server (locally or hosted) → same-origin relative paths.
+// Opened directly as a file → fall back to the local server.
+const API = location.protocol.startsWith('http') ? '' : 'http://localhost:5000';
+let PUBLIC_MODE = false;   // set from /health — hosted demo hides owner-only controls
+
+function _applyPublicMode() {
+  if (PUBLIC_MODE) return;
+  PUBLIC_MODE = true;
+  document.body.classList.add('public-mode');
+  if (!document.getElementById('publicBanner')) {
+    const b = document.createElement('div');
+    b.id = 'publicBanner';
+    b.className = 'public-banner';
+    b.innerHTML = '<span>👋 Public demo of <b>Job Analyser</b> — a side project by '
+      + '<a href="https://www.obencelik.com" target="_blank" rel="noopener">Oben Celik</a>. '
+      + 'Searches LinkedIn\'s public job listings and analyses them with AI. '
+      + 'Usage is rate-limited; the library is shared by all visitors.</span>';
+    const anchor = document.querySelector('.search-section');
+    if (anchor) anchor.before(b); else document.body.prepend(b);
+  }
+  if (typeof viewMode !== 'undefined' && viewMode === 'favorites') showSearch();
+}
+
 // ─── State ───────────────────────────────────────────────
 let allJobs = [];
 let filteredJobs = [];
@@ -706,15 +748,18 @@ let _aiBannerDismissed = false;    // dismissed for this session only
 
 async function checkServer() {
   try {
-    const res = await fetch('http://localhost:5000/health', { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(API + '/health', { signal: AbortSignal.timeout(2000) });
     if (res.ok) {
       const data = await res.json();
       serverOnline = true;
+      if (data.public) _applyPublicMode();
       const aiOk = !!data.anthropic_configured;
       aiConfigured = aiOk;
       document.getElementById('statusDot').style.background = '#00c9a7';
-      document.getElementById('statusText').textContent =
-        `🟢 Guest mode${aiOk ? ' + ✨ AI' : (data.ai_disabled ? ' · ⏸ AI paused' : '')}`;
+      document.getElementById('statusText').textContent = data.public
+        ? `🟢 Live demo${aiOk ? ' + ✨ AI' : ''}`
+        : `🟢 Guest mode${aiOk ? ' + ✨ AI' : (data.ai_disabled ? ' · ⏸ AI paused' : '')}`;
+      if (data.public) { const ab = document.getElementById('aiBanner'); if (ab) ab.remove(); return true; }
       // Don't nag to add a key if one exists but is just paused.
       updateAiBanner(aiOk || !!data.ai_disabled);
       return true;
@@ -723,7 +768,9 @@ async function checkServer() {
   serverOnline = false;
   const ab = document.getElementById('aiBanner'); if (ab) ab.remove();   // server-offline message takes over
   document.getElementById('statusDot').style.background = '#e74c3c';
-  document.getElementById('statusText').textContent = '🔴 Server offline — start start.bat';
+  document.getElementById('statusText').textContent = PUBLIC_MODE
+    ? '🔴 Demo server is waking up — try again in a minute'
+    : '🔴 Server offline — start start.bat';
   return false;
 }
 
@@ -785,10 +832,10 @@ async function toggleAuto() {
   const isActive = _autoSearches.some(s => s.active && s.key === key);
   try {
     if (isActive) {
-      await fetch('http://localhost:5000/auto/stop', {
+      await fetch(API + '/auto/stop', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
     } else {
-      await fetch('http://localhost:5000/auto/start', {
+      await fetch(API + '/auto/start', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, location, tpr }) });
     }
   } catch (e) { /* ignore */ }
@@ -797,7 +844,7 @@ async function toggleAuto() {
 
 async function refreshAutoStatus() {
   try {
-    const res = await fetch('http://localhost:5000/auto/status');
+    const res = await fetch(API + '/auto/status');
     if (!res.ok) return;
     const data = await res.json();
     _autoSearches    = data.searches || [];
@@ -826,7 +873,7 @@ function _renderAutoUI() {
 
 async function _stopAuto(encKey) {
   try {
-    await fetch('http://localhost:5000/auto/stop', {
+    await fetch(API + '/auto/stop', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: decodeURIComponent(encKey) }) });
   } catch (e) {}
@@ -847,7 +894,7 @@ function openSettings() {
     document.getElementById(inputId).placeholder = isSaved ? 'Leave blank to keep current key' : defaultPlaceholder;
     document.getElementById(inputId).value = '';
   }
-  fetch('http://localhost:5000/health').then(r => r.json()).then(data => {
+  fetch(API + '/health').then(r => r.json()).then(data => {
     setKeyState('groq-status', 'groq-clear', 'sGroq', 'gsk_…', data.has_key);   // a paused key is still "saved"
     _renderAiToggle(data.has_key, data.ai_disabled);
   }).catch(() => {});
@@ -870,9 +917,9 @@ function _renderAiToggle(hasKey, disabled) {
 
 async function toggleAi() {
   try {
-    const h = await (await fetch('http://localhost:5000/health')).json();
+    const h = await (await fetch(API + '/health')).json();
     const enable = !!h.ai_disabled;   // currently paused → enable; otherwise pause
-    const res = await fetch('http://localhost:5000/config/ai-toggle', {
+    const res = await fetch(API + '/config/ai-toggle', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enable }) });
     const d = await res.json();
     _renderAiToggle(h.has_key, !d.ai_enabled);
@@ -884,7 +931,7 @@ async function clearApiKey(keyName, statusId, clearBtnId, inputId, defaultPlaceh
   const btn = document.getElementById(clearBtnId);
   btn.textContent = '…'; btn.disabled = true;
   try {
-    const res = await fetch('http://localhost:5000/config/clear-key', {
+    const res = await fetch(API + '/config/clear-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: keyName }),
@@ -910,7 +957,7 @@ async function resetEverything() {
   const status = document.getElementById('resetStatus');
   status.style.color = 'var(--muted)'; status.textContent = 'Resetting…';
   try {
-    const res = await fetch('http://localhost:5000/data/reset', { method: 'POST' });
+    const res = await fetch(API + '/data/reset', { method: 'POST' });
     if (!res.ok) throw new Error();
   } catch (e) {
     status.style.color = 'var(--danger)'; status.textContent = 'Could not reach server.'; return;
@@ -964,7 +1011,7 @@ async function saveSettings() {
   status.style.color = 'var(--muted)';
   status.textContent = 'Saving AI key…';
   try {
-    const res = await fetch('http://localhost:5000/config', {
+    const res = await fetch(API + '/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ gemini_key: groq }),
@@ -1065,7 +1112,7 @@ function doSearch(forceFresh = false) {
   if (tpr) params.append('tpr', tpr);
   params.append('_t', Date.now());   // cache-buster: stop the browser replaying a cached SSE response
 
-  _currentSource = new EventSource(`http://localhost:5000/stream?${params}`);
+  _currentSource = new EventSource(`${API}/stream?${params}`);
 
   _currentSource.onmessage = (e) => {
     let data;
@@ -1190,7 +1237,7 @@ function _runAppendStream(params, opts) {
   const before = allJobs.length;
   _newCount = 0;
   _setLoadState('loading', opts.label + '…');
-  _currentSource = new EventSource(`http://localhost:5000/stream?${params}`);
+  _currentSource = new EventSource(`${API}/stream?${params}`);
 
   _currentSource.onmessage = (e) => {
     let data; try { data = JSON.parse(e.data); } catch { return; }
@@ -1626,7 +1673,7 @@ function _updateFavCount() {
 
 async function loadFavIds() {
   try {
-    const res = await fetch('http://localhost:5000/favorites/ids');
+    const res = await fetch(API + '/favorites/ids');
     if (!res.ok) return;
     const data = await res.json();
     _favIds.clear();
@@ -1643,13 +1690,13 @@ async function toggleFavorite(id) {
   const wasFav = _favIds.has(job.jobId);
   try {
     if (wasFav) {
-      await fetch('http://localhost:5000/unfavorite', {
+      await fetch(API + '/unfavorite', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job_id: job.jobId }),
       });
       _favIds.delete(job.jobId);
     } else {
-      await fetch('http://localhost:5000/favorite', {
+      await fetch(API + '/favorite', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job }),
       });
@@ -1701,7 +1748,7 @@ async function showFavorites() {
   const panel = document.getElementById('jobsPanel');
   panel.innerHTML = `<div class="state-box"><div class="spinner"></div><p>Loading favorites…</p></div>`;
   try {
-    const res = await fetch('http://localhost:5000/favorites');
+    const res = await fetch(API + '/favorites');
     const data = await res.json();
     favJobs = (data.favorites || []).map((j, i) => ({ ...j, id: i, _detailDone: true }));
   } catch (e) { favJobs = []; }
@@ -1724,7 +1771,7 @@ async function showHistory() {
   const panel = document.getElementById('jobsPanel');
   panel.innerHTML = `<div class="state-box"><div class="spinner"></div><p>Loading library…</p></div>`;
   try {
-    const libRes = await fetch('http://localhost:5000/library');
+    const libRes = await fetch(API + '/library');
     const libData = await libRes.json();
     libJobs = (libData.jobs || []).map((row, i) => {
       const j = _mapRawJob(row, i);
@@ -1788,7 +1835,7 @@ function analyzeLibrary() {
   if (!aiConfigured) { showError('Resume AI in ⚙️ Settings first (it’s paused or no key).'); return; }
   const btn = document.getElementById('analyzeAllBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Analyzing…'; }
-  const es = new EventSource('http://localhost:5000/analyse-library');
+  const es = new EventSource(API + '/analyse-library');
   es.onmessage = (e) => {
     let d; try { d = JSON.parse(e.data); } catch { return; }
     if (d.__error__) { es.close(); if (btn) { btn.disabled = false; btn.textContent = '✨ Analyze all'; } showError(d.__error__); return; }
@@ -1832,7 +1879,7 @@ async function ensureDetail(job, signal) {
   if (job.description) return false;   // this job object already has its description (favorite / prior fetch)
   if (!serverOnline) return false;
   try {
-    const res = await fetch(`http://localhost:5000/job/${job.jobId}`, signal ? { signal } : undefined);
+    const res = await fetch(`${API}/job/${job.jobId}`, signal ? { signal } : undefined);
     if (res.ok) {
       const d = await res.json();
       if (d.job_description)     job.description = d.job_description;
@@ -1892,7 +1939,7 @@ async function _bulkLoadCached(jobs) {
   const ids = jobs.filter(j => j.jobId && !j.description).map(j => j.jobId);
   if (!ids.length) return loaded;
   try {
-    const res = await fetch('http://localhost:5000/jobs/bulk', {
+    const res = await fetch(API + '/jobs/bulk', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
     if (!res.ok) return loaded;
     const map = (await res.json()).jobs || {};
@@ -2337,7 +2384,7 @@ async function _analyseBatch(jobs) {
   }));
 
   try {
-    const res = await fetch('http://localhost:5000/analyse-batch', {
+    const res = await fetch(API + '/analyse-batch', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ jobs: payload }),
@@ -2501,7 +2548,7 @@ async function estimateSalary(event, id) {
   await ensureDetail(job);   // make sure we have the description
   try {
     // Dedicated salary endpoint — forces a fresh estimate even if the job was already analysed.
-    const res = await fetch('http://localhost:5000/estimate-salary', {
+    const res = await fetch(API + '/estimate-salary', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: job.title, company: job.company, location: job.location,
                              work_type: job.workType, description: job.description || '' }),

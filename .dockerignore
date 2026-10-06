@@ -1,0 +1,13 @@
+.git
+.github
+cloudflare
+__pycache__
+*.pyc
+*.bat
+*.spec
+build/
+dist/
+config.json
+jobs.db*
+guest_probe.py
+CLAUDE.md

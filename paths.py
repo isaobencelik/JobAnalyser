@@ -27,6 +27,11 @@ else:
 
 
 def _resolve_data_dir():
+    # Hosted deployments (e.g. Hugging Face) set JOBANALYSER_DATA_DIR to a writable folder.
+    override = os.environ.get('JOBANALYSER_DATA_DIR')
+    if override:
+        os.makedirs(override, exist_ok=True)
+        return override
     if FROZEN:
         base = os.environ.get('LOCALAPPDATA') or os.path.expanduser('~')
         d = os.path.join(base, 'JobAnalyser')

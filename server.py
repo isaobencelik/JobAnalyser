@@ -14,6 +14,7 @@ import paths
 
 app = Flask(__name__)
 CORS(app, origins=['null', 'file://', 'http://localhost:5000', 'http://127.0.0.1:5000'])
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024   # 2 MB request cap (public safety; plenty for local use)
 
 # ═══════════════════════════════════════════════════════════
 #  GUEST MODE — no LinkedIn login, no password stored.
@@ -24,10 +25,24 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_KEY")
 AI_ENABLED     = True   # user can pause AI (keeps the key) so testing doesn't spend Gemini quota
 # ═══════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════
+#  PUBLIC MODE — set PUBLIC_MODE=1 when hosting for visitors
+#  (e.g. jobanalyser.obencelik.com). The Gemini key comes ONLY
+#  from the GEMINI_API_KEY secret, admin routes are switched off,
+#  favorites/auto-collect are disabled (one shared server), and
+#  LinkedIn + Gemini usage is rate-limited per visitor and capped
+#  per day so a public demo can't run up a bill or get banned.
+#  Unset (default) = your normal local app, behaviour unchanged.
+PUBLIC_MODE        = os.environ.get('PUBLIC_MODE', '0') == '1'
+PUBLIC_GEMINI_DAY  = int(os.environ.get('PUBLIC_GEMINI_DAILY_CAP', '300'))  # Gemini calls / day, all visitors
+# ═══════════════════════════════════════════════════════════
+
 CONFIG_FILE = os.path.join(paths.DATA_DIR, 'config.json')
 
 def load_config():
     global GEMINI_API_KEY, AI_ENABLED
+    if PUBLIC_MODE:
+        return          # public: key comes from the environment secret only, never a file
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE) as f:
@@ -48,6 +63,103 @@ def _ai_active():
 
 load_config()
 db.init()
+
+
+# ─── Public-mode guards ───────────────────────────────────
+import threading as _threading
+from collections import deque as _deque
+
+# Routes a visitor must never reach on the shared public server.
+_PUBLIC_BLOCKED = {
+    '/config', '/config/ai-toggle', '/config/clear-key',   # change / clear / pause the owner's key
+    '/data/reset', '/cache/clear',                         # wipe shared data
+    '/auto/start', '/auto/stop',                           # background collector (runs forever, costs money)
+    '/analyse-library',                                    # bulk-analyses the whole library in one click
+    '/favorite', '/unfavorite',                            # one shared DB — favorites would mix visitors
+    '/searches',                                           # would reveal other visitors' searches
+}
+# Read-only routes that would otherwise leak shared/admin state → answer with harmless empties.
+_PUBLIC_EMPTY = {
+    '/favorites':     lambda: {'favorites': []},
+    '/favorites/ids': lambda: {'ids': []},
+    '/auto/status':   lambda: {'searches': [], 'interval_min': 30, 'daily_cap': 0, 'max_hours': 0},
+}
+# Per-visitor rate limits: path -> (max requests, window seconds).
+_PUBLIC_LIMITS = {
+    '/stream':          (12, 600),     # LinkedIn searches
+    '/search':          (12, 600),
+    '/job/':            (120, 600),    # job detail fetches (LinkedIn)
+    '/jobs/bulk':       (60, 600),
+    '/analyse-batch':   (20, 600),     # Gemini
+    '/analyse':         (20, 600),
+    '/summarize':       (20, 600),
+    '/estimate-salary': (30, 600),
+}
+_rl_hits = {}
+_rl_lock = _threading.Lock()
+
+
+def _client_ip():
+    """Best-effort visitor IP behind Cloudflare / Hugging Face proxies.
+    X-Visitor-IP is set by our own Cloudflare Worker (cloudflare/worker.js)."""
+    return (request.headers.get('X-Visitor-IP')
+            or (request.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
+            or request.remote_addr or '?')
+
+
+def _rate_limited(path):
+    rule = next(((p, lim) for p, lim in _PUBLIC_LIMITS.items()
+                 if path == p or (p.endswith('/') and path.startswith(p))), None)
+    if not rule:
+        return False
+    prefix, (limit, window) = rule
+    key, now = (_client_ip(), prefix), time.time()
+    with _rl_lock:
+        q = _rl_hits.setdefault(key, _deque())
+        while q and now - q[0] > window:
+            q.popleft()
+        if len(q) >= limit:
+            return True
+        q.append(now)
+        if len(_rl_hits) > 5000:                     # bound memory
+            _rl_hits.pop(next(iter(_rl_hits)))
+    return False
+
+
+@app.before_request
+def _public_guard():
+    if not PUBLIC_MODE:
+        return None
+    path = request.path
+    if path in _PUBLIC_BLOCKED:
+        return jsonify({'error': 'Not available in the public demo.'}), 403
+    if path in _PUBLIC_EMPTY:
+        return jsonify(_PUBLIC_EMPTY[path]())
+    if _rate_limited(path):
+        msg = 'You are going a bit fast for the public demo — please wait a few minutes.'
+        if path in ('/stream', '/analyse-library'):  # EventSource clients read SSE, not JSON
+            from flask import Response
+            return Response(f'data: {json.dumps({"__error__": msg})}\n\n', mimetype='text/event-stream')
+        return jsonify({'error': msg}), 429
+    return None
+
+
+_gemini_day = {'day': None, 'n': 0}
+_gemini_lock = _threading.Lock()
+
+
+def _gemini_budget_ok():
+    """Public mode: global daily cap on Gemini calls (all visitors together)."""
+    if not PUBLIC_MODE:
+        return True
+    today = _dt.date.today().isoformat()
+    with _gemini_lock:
+        if _gemini_day['day'] != today:
+            _gemini_day['day'], _gemini_day['n'] = today, 0
+        if _gemini_day['n'] >= PUBLIC_GEMINI_DAY:
+            return False
+        _gemini_day['n'] += 1
+        return True
 
 # City → (lat, lng) for map markers
 CITY_COORDS = {
@@ -93,6 +205,11 @@ SWEEP_MAX_PAGES    = 10      # per (title,location) safety cap when sweeping a w
 AI_PROMPT_VERSION  = 3       # bump whenever the analyse-batch prompt/schema changes →
                              # cached analyses from older versions are re-run automatically
                              # v3: red flags now inferred from the posting (not just explicit)
+SWEEP_MAX_PAIRS    = 11      # max (title, location) combinations per sweep
+SWEEP_MAX_TIERS    = 14      # max time windows per sweep
+if PUBLIC_MODE:              # lighter sweeps on the shared server so LinkedIn doesn't block it
+    SWEEP_MAX_PAGES, SWEEP_MAX_PAIRS, SWEEP_MAX_TIERS = 3, 4, 4
+    LOAD_ALL_MAX_PAGES = 8
 
 
 def _ai_stale(ai):
@@ -347,6 +464,8 @@ def _call_gemini(prompt, max_tokens=500, json_mode=False):
 
     if not _ai_active():
         raise RuntimeError('ai_disabled' if (GEMINI_API_KEY and GEMINI_API_KEY != 'YOUR_GEMINI_KEY') else 'no_key')
+    if not _gemini_budget_ok():
+        raise RuntimeError('daily_limit — the public demo has used today\'s AI allowance, try again tomorrow')
 
     model = 'gemini-3.1-flash-lite'
     url   = (f'https://generativelanguage.googleapis.com/v1beta/models/'
@@ -415,6 +534,7 @@ def health():
         'status':               'ok',
         'source':               'linkedin-guest',
         'mode':                 'guest',
+        'public':               PUBLIC_MODE,
         'anthropic_configured': _ai_active(),
         'has_key':              has_key,
         'ai_disabled':          has_key and not AI_ENABLED,
@@ -725,7 +845,7 @@ def _sweep_tiers(sel_days):
         tiers.append(d); d += 7
     if not tiers or tiers[-1] != sel_days:
         tiers.append(sel_days)
-    tiers = tiers[:14]
+    tiers = tiers[:SWEEP_MAX_TIERS]
     if tiers[-1] != sel_days:                        # always finish exactly at the selected horizon
         tiers[-1] = sel_days
     return tiers
@@ -802,7 +922,7 @@ def stream_search():
                                 kk = (t.lower(), (loc or '').lower())
                                 if kk not in paired:
                                     paired.add(kk); pairs.append((t, loc))
-                    pairs = pairs[:11]
+                    pairs = pairs[:SWEEP_MAX_PAIRS]
                     primary_pairs = [(t, locs[0]) for t in title_list]
                     for d in tiers:
                         win_tpr   = f"r{d * 86400}"
@@ -1272,6 +1392,8 @@ def analyse_batch():
     jobs = body.get('jobs', [])
     if not jobs:
         return jsonify({'error': 'no jobs'}), 400
+    if PUBLIC_MODE:
+        jobs = jobs[:20]          # one Gemini call per request — keep each one bounded
     try:
         return jsonify({'results': _analyse_and_persist(jobs)})
     except RuntimeError as e:
@@ -1509,5 +1631,11 @@ if __name__ == '__main__':
     if paths.FROZEN:
         import threading, webbrowser
         threading.Timer(1.2, lambda: webbrowser.open('http://localhost:5000/')).start()
-    _start_auto_worker()   # background "active search" collector
-    app.run(host='127.0.0.1', port=5000, debug=False, threaded=True)
+    if PUBLIC_MODE:
+        # Hosted: listen on all interfaces at the platform's port (Hugging Face uses 7860).
+        # No background collector — visitors can't start one and it would run up costs.
+        print('  PUBLIC MODE: admin routes off, rate limits on')
+        app.run(host='0.0.0.0', port=int(os.environ.get('PORT', '7860')), debug=False, threaded=True)
+    else:
+        _start_auto_worker()   # background "active search" collector
+        app.run(host='127.0.0.1', port=5000, debug=False, threaded=True)
