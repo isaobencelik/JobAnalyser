@@ -1,0 +1,25 @@
+# Secrets — never commit these
+config.json
+LOGIN DO NOT TOUCH.txt
+*.env
+.env
+
+# Local database (fetched-job cache + favorites)
+jobs.db
+jobs.db-wal
+jobs.db-shm
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# PyInstaller build outputs (rebuild with build.bat)
+build/
+dist/
+*.exe
+*.spec
+
+# Editor / OS temp files
+.fuse_hidden*

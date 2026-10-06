@@ -1,0 +1,2588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Analyser — LinkedIn</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3250;
+    --accent: #4f6ef7;
+    --accent2: #00c9a7;
+    --warn: #f7b731;
+    --danger: #e74c3c;
+    --text: #e8eaf6;
+    --muted: #8890b5;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.3px; }
+  header h1 span { color: var(--accent); }
+  .badge { font-size: 0.7rem; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  /* ── View tabs (Search / Favorites) ── */
+  .view-tabs { display: flex; gap: 6px; margin-left: 18px; }
+  .view-tab {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+    padding: 6px 14px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.15s;
+  }
+  .view-tab:hover { border-color: var(--accent); color: var(--text); }
+  .view-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  /* ── Load more / Load all footer ── */
+  .load-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;
+    padding: 16px 8px 8px; margin-top: 8px; border-top: 1px solid var(--border); }
+  .load-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; transition: all 0.15s; }
+  .load-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .load-btn.alt { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .load-btn.alt:hover { filter: brightness(1.1); color: #fff; }
+  .load-allset { font-size: 0.82rem; color: var(--muted); }
+  .load-spin { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; display: inline-block; animation: spin 0.7s linear infinite; }
+  /* ── Auto-search toggle + status ── */
+  .auto-toggle { background: var(--surface2) !important; border: 1px solid var(--border) !important;
+    color: var(--muted) !important; }
+  .auto-toggle.on { background: #b3261e !important; border-color: #b3261e !important; color: #fff !important;
+    animation: autopulse 1.8s ease-in-out infinite; }
+  @keyframes autopulse { 0%,100% { box-shadow: 0 0 0 0 rgba(179,38,30,0.5); } 50% { box-shadow: 0 0 0 5px rgba(179,38,30,0); } }
+  .search-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 9px; }
+  .exact-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); cursor: pointer; user-select: none; }
+  .exact-toggle input { cursor: pointer; }
+  .search-variants { font-size: 0.78rem; color: var(--accent2); }
+  .auto-status { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .auto-pill { font-size: 0.76rem; color: var(--accent2); background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; display: inline-flex; gap: 6px; align-items: center; }
+  .auto-pill a { color: var(--muted); cursor: pointer; font-weight: 700; }
+  .auto-pill a:hover { color: var(--danger); }
+  /* ── History (library) view ── */
+  .hist-title-row { font-size: 1.05rem; font-weight: 700; color: var(--text); display: flex;
+    align-items: center; gap: 10px; margin: 2px 2px 12px; }
+  .hist-count { font-size: 0.78rem; font-weight: 600; color: var(--muted);
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 2px 9px; }
+  .hist-head { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 2px 10px; }
+  .hist-filter {
+    flex: 1 1 130px; min-width: 110px; box-sizing: border-box; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: 0.85rem;
+  }
+  .hist-filter:focus { outline: none; border-color: var(--accent); }
+  .hist-sort { flex: 0 0 auto; min-width: 140px; cursor: pointer; }
+  .hist-list { display: flex; flex-direction: column; gap: 4px; }
+  .hist-row {
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 10px; transition: border-color 0.12s, background 0.12s;
+  }
+  .hist-row:hover { border-color: var(--accent); background: var(--surface); }
+  .hist-fav {
+    background: none; border: none; cursor: pointer; font-size: 1rem;
+    color: var(--muted); padding: 0; line-height: 1; flex: 0 0 auto;
+  }
+  .hist-fav.on { color: var(--warn); }
+  .hist-logo {
+    width: 30px; height: 30px; border-radius: 6px; object-fit: contain;
+    background: #fff; flex: 0 0 auto;
+  }
+  .hist-main { flex: 1 1 auto; min-width: 0; }
+  .hist-title {
+    font-size: 0.88rem; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hist-sub {
+    font-size: 0.76rem; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hist-meta { font-size: 0.74rem; color: var(--muted); flex: 0 0 auto; white-space: nowrap; }
+  .hist-wt-remote { color: var(--accent2); }
+  .hist-wt-hybrid { color: var(--warn); }
+  .hist-score {
+    flex: 0 0 auto; font-size: 0.82rem; font-weight: 700; min-width: 26px; text-align: center;
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+  }
+  /* ── Favorite star on cards ── */
+  .fav-btn {
+    background: none; border: none; cursor: pointer; font-size: 1.15rem; line-height: 1;
+    color: var(--muted); padding: 2px 4px; transition: transform 0.1s, color 0.15s; flex-shrink: 0;
+  }
+  .fav-btn:hover { transform: scale(1.15); }
+  .fav-btn.on { color: var(--warn); }
+
+  /* ── Search bar ── */
+  .search-section {
+    background: linear-gradient(135deg, #1a1d27 0%, #1e2240 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 28px 32px;
+  }
+  .search-row { display: flex; gap: 10px; flex-wrap: wrap; max-width: 900px; }
+  .search-row input, .search-row select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 11px 16px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-row input:focus, .search-row select:focus { border-color: var(--accent); }
+  .search-row input[name=query] { flex: 2; min-width: 180px; }
+  .search-row input[name=location] { flex: 1.5; min-width: 140px; }
+  .search-row select { flex: 1; min-width: 130px; }
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 11px 24px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .btn:hover { opacity: 0.88; }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+
+  /* ── API Key notice ── */
+  .api-notice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #2a1f0a;
+    border: 1px solid #7a5010;
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-top: 14px;
+    font-size: 0.85rem;
+    color: #f5c16c;
+    max-width: 900px;
+  }
+  .api-notice a { color: #f5c16c; text-decoration: underline; }
+  .api-key-row { display: flex; gap: 8px; margin-top: 8px; }
+  .api-key-row input { flex: 1; background: #1a1400; border: 1px solid #7a5010; color: #f5c16c; padding: 7px 12px; border-radius: 6px; font-size: 0.85rem; outline: none; }
+  .btn-sm { padding: 7px 14px; font-size: 0.82rem; }
+
+  /* ── Filters ── */
+  .filters-row {
+    padding: 14px 32px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .filter-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .filter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .filter-label { font-size: 0.82rem; color: var(--muted); margin-right: 4px; }
+  .range-wrap { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+  .range-wrap input[type=range] { accent-color: var(--accent); width: 100px; }
+
+  /* ── Layout ── */
+  .main { display: flex; height: calc(100vh - 220px); min-height: 500px; }
+  .jobs-panel { flex: 1.3; overflow-y: auto; padding: 20px 24px; border-right: 1px solid var(--border); }
+  .right-panel { flex: 1; overflow-y: auto; padding: 20px; }
+
+  /* ── AI Summary on card ── */
+  .card-ai-summary {
+    margin-top: 10px; padding: 10px 12px;
+    background: rgba(79,110,247,0.06);
+    border: 1px solid rgba(79,110,247,0.18);
+    border-radius: 8px;
+  }
+  .card-ai-summary.ai-loading { animation: aiPulse 1.4s ease-in-out infinite; }
+  @keyframes aiPulse { 0%,100%{opacity:.45} 50%{opacity:.85} }
+  .ai-trigger-btn {
+    background: none; border: 1px solid rgba(79,110,247,0.3); color: var(--accent);
+    border-radius: 6px; padding: 5px 11px; font-size: 0.78rem; cursor: pointer;
+    width: 100%; text-align: left; transition: background 0.15s;
+  }
+  .ai-trigger-btn:hover { background: rgba(79,110,247,0.12); }
+  .ai-analyzing { display: inline-flex; align-items: center; gap: 7px; cursor: default; opacity: 0.9; }
+  .ai-analyzing:hover { background: none; }
+  .ai-bullet {
+    display: flex; align-items: flex-start; gap: 7px;
+    font-size: 0.78rem; line-height: 1.5; margin-bottom: 5px;
+    color: var(--text);
+  }
+  .ai-bullet:last-child { margin-bottom: 0; }
+  .ai-bullet .ai-icon { flex-shrink: 0; font-size: 0.82rem; margin-top: 1px; }
+  .ai-badge {
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.4px;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  /* ── Card description toggle ── */
+  .card-desc-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 0.78rem; color: var(--accent); cursor: pointer;
+    margin-top: 10px; padding: 5px 8px; user-select: none;
+    background: rgba(79,110,247,0.07); border: 1px solid rgba(79,110,247,0.2);
+    border-radius: 6px; transition: background 0.15s;
+  }
+  .card-desc-toggle:hover { background: rgba(79,110,247,0.14); }
+  .card-desc-content {
+    font-size: 0.8rem; color: var(--muted); line-height: 1.65;
+    margin-top: 6px; padding: 12px; background: var(--surface2);
+    border-radius: 8px; border-left: 2px solid var(--accent);
+    max-height: 260px; overflow-y: auto; display: none;
+    white-space: pre-wrap;
+  }
+
+
+  /* ── Stats bar ── */
+  .stats-bar {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    padding: 10px 0 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .stat { text-align: center; }
+  .stat-val { font-size: 1.3rem; font-weight: 700; color: var(--accent); }
+  .stat-lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* ── Job Card ── */
+  .job-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+    position: relative;
+  }
+  .job-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .job-card.selected { border-color: var(--accent); background: #1a1f38; }
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .job-title { font-size: 0.9rem; font-weight: 400; line-height: 1.3; color: var(--muted); margin-top: 2px; }
+  .score-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 10px;
+    text-align: center;
+    min-width: 54px;
+    flex-shrink: 0;
+  }
+  .score-badge .score-num { font-size: 1.1rem; font-weight: 700; }
+  .score-badge .score-lbl { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .score-high { color: var(--accent2); border-color: var(--accent2); }
+  .score-mid { color: var(--warn); border-color: var(--warn); }
+  .score-low { color: var(--danger); border-color: var(--danger); }
+  .company-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 0.85rem; color: var(--muted); flex-wrap: wrap; }
+  .company-name { color: var(--text); font-weight: 700; font-size: 0.97rem; }
+  .star-rating { color: var(--warn); font-size: 0.8rem; }
+  .tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .tag.remote { color: var(--accent2); border-color: var(--accent2); background: rgba(0,201,167,0.08); }
+  .tag.hybrid { color: var(--accent); border-color: var(--accent); background: rgba(79,110,247,0.08); }
+  .card-meta { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  .salary-chip {
+    background: rgba(0,201,167,0.1);
+    border: 1px solid rgba(0,201,167,0.3);
+    color: var(--accent2);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .salary-chip.unknown { background: var(--surface2); border-color: var(--border); color: var(--muted); font-weight: 400; }
+  .salary-chip.estimated { background: rgba(255,193,7,0.08); border-color: rgba(255,193,7,0.3); color: var(--warn); }
+  .sal-est-btn {
+    background: none; border: 1px solid rgba(0,201,167,0.4); color: var(--accent2);
+    border-radius: 4px; padding: 1px 7px; font-size: 0.72rem; cursor: pointer; line-height: 1.4;
+  }
+  .sal-est-btn:hover { background: rgba(0,201,167,0.12); }
+
+  /* ── AI Insights panel (right side) ─────────────────── */
+  .ai-insights { margin: 14px 0; display: flex; flex-direction: column; gap: 10px; }
+  .insights-section { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .insights-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+  .skill-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .skill-pill {
+    background: rgba(79,110,247,0.1); border: 1px solid rgba(79,110,247,0.25);
+    color: var(--accent); font-size: 0.72rem; font-weight: 500;
+    border-radius: 4px; padding: 2px 8px; white-space: nowrap;
+  }
+  .flag-list { display: flex; flex-direction: column; gap: 5px; }
+  .flag-item { font-size: 0.78rem; color: var(--text); display: flex; align-items: flex-start; gap: 6px; line-height: 1.4; }
+  .flag-item.red  { color: #e57373; }
+  .flag-item.green { color: var(--accent2); }
+  .culture-row { display: flex; align-items: center; gap: 8px; }
+  .culture-badge {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.3px; text-transform: capitalize;
+    border-radius: 4px; padding: 2px 9px; border: 1px solid;
+  }
+  .culture-badge.startup  { background: rgba(255,107,107,0.1); border-color: rgba(255,107,107,0.3); color: #ff6b6b; }
+  .culture-badge.scale-up { background: rgba(255,193,7,0.1);   border-color: rgba(255,193,7,0.3);   color: var(--warn); }
+  .culture-badge.corporate { background: rgba(79,110,247,0.1); border-color: rgba(79,110,247,0.3);  color: var(--accent); }
+  .culture-badge.enterprise { background: rgba(100,100,120,0.15); border-color: rgba(100,100,120,0.3); color: var(--muted); }
+  .seniority-read { font-size: 0.78rem; color: var(--muted); font-style: italic; }
+  .insights-placeholder { font-size: 0.78rem; color: var(--muted); font-style: italic; text-align: center; padding: 6px 0; }
+
+  .meta-pill {
+    font-size: 0.78rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  /* ── Card detail fields (seniority / type / function / industry) as a list ── */
+  .card-fields { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+  .card-fields li { font-size: 0.78rem; color: var(--muted); display: flex; align-items: flex-start; gap: 7px; line-height: 1.4; }
+  .card-fields li .cf-ico { flex-shrink: 0; }
+  .score-bar-wrap { margin-top: 12px; }
+  .score-bar-label { display: flex; justify-content: space-between; font-size: 0.73rem; color: var(--muted); margin-bottom: 3px; }
+  .score-bar-track { background: var(--surface2); border-radius: 4px; height: 5px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+
+  /* ── Empty / Loading / Error states ── */
+  .state-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: var(--muted);
+    gap: 12px;
+    text-align: center;
+  }
+  .state-box .icon { font-size: 2.5rem; }
+  .state-box p { font-size: 0.9rem; max-width: 280px; line-height: 1.5; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Company Panel ── */
+  .company-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); gap: 10px; text-align: center; }
+  .company-empty .icon { font-size: 2rem; }
+  .company-empty p { font-size: 0.85rem; max-width: 220px; line-height: 1.5; }
+  .company-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .company-logo-box { width: 56px; height: 56px; border-radius: 10px; background: var(--surface2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; overflow: hidden; }
+  .company-logo-box img { width: 100%; height: 100%; object-fit: contain; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .detail-item { background: var(--surface2); border-radius: 8px; padding: 10px 12px; }
+  /* ── Compact LinkedIn details ── */
+  .ld-compact { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 14px; padding: 8px 12px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; font-size: 0.78rem; }
+  .ld-compact > div { display: flex; gap: 6px; align-items: baseline; }
+  .ld-compact span { color: var(--muted); }
+  .ld-compact b { color: var(--text); font-weight: 600; }
+  /* ── Job description (collapsible, in detail panel) ── */
+  .jd-block { margin: 12px 0; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface2); overflow: hidden; }
+  .jd-block summary { cursor: pointer; padding: 9px 12px; font-size: 0.82rem; font-weight: 600;
+    color: var(--text); list-style: none; user-select: none; }
+  .jd-block summary::-webkit-details-marker { display: none; }
+  .jd-block summary::before { content: '▸ '; color: var(--muted); }
+  .jd-block[open] summary::before { content: '▾ '; }
+  .jd-block summary:hover { color: var(--accent); }
+  .jd-text { padding: 0 14px 14px; font-size: 0.82rem; line-height: 1.55; color: var(--text);
+    word-break: break-word; max-height: 360px; overflow-y: auto; }
+  .jd-h { font-weight: 700; color: var(--text); margin: 12px 0 4px; font-size: 0.82rem; }
+  .jd-h:first-child { margin-top: 0; }
+  .jd-p { margin: 0 0 8px; }
+  .jd-ul { margin: 4px 0 10px; padding-left: 20px; }
+  .jd-ul li { margin-bottom: 4px; }
+  .card-desc-content .jd-h { font-size: 0.8rem; }
+  /* ── PDF export buttons ── */
+  .exp-btn { background: none; border: none; cursor: pointer; font-size: 1rem; line-height: 1;
+    color: var(--muted); padding: 2px 4px; border-radius: 5px; opacity: 0.7; }
+  .exp-btn:hover { opacity: 1; color: var(--accent); background: var(--surface2); }
+  .hist-exp { background: none; border: none; cursor: pointer; font-size: 0.95rem; line-height: 1;
+    color: var(--muted); padding: 2px 4px; margin-left: 4px; border-radius: 5px; opacity: 0.65; flex-shrink: 0; }
+  .hist-exp:hover { opacity: 1; color: var(--accent); }
+  .fav-export-bar { display: flex; justify-content: flex-end; margin: 0 0 10px; }
+  /* ── Grouped key skills ── */
+  .skill-group { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+  .skill-group:last-child { margin-bottom: 0; }
+  .skill-group-lbl { flex-shrink: 0; width: 64px; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  /* ── Skills & Requirements — flat columns (Technical · Process · Soft) ── */
+  .skills-cols { display: flex; gap: 14px; align-items: flex-start; }
+  .skills-col { flex: 1; min-width: 0; }
+  .skills-col-lbl { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+  .detail-item-lbl { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+  .detail-item-val { font-size: 0.92rem; font-weight: 600; }
+  .apply-btn { display: block; text-align: center; margin-top: 4px; background: var(--accent); color: #fff; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; text-decoration: none; }
+  .apply-btn:hover { opacity: 0.85; }
+  .glassdoor-btn { display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 14px; background: #0caa41; color: #fff; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; text-decoration: none; }
+  .glassdoor-btn:hover { opacity: 0.88; }
+
+  /* ── Settings Modal ── */
+  .settings-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65); z-index: 9000;
+    align-items: center; justify-content: center;
+  }
+  .settings-backdrop.open { display: flex; }
+  .settings-modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); width: 420px; max-width: 95vw;
+    padding: 24px; position: relative;
+  }
+  .settings-modal h2 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+  .settings-modal .sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 20px; }
+  .settings-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; }
+  .sfield { display: flex; flex-direction: column; gap: 5px; margin-bottom: 13px; }
+  .sfield label { font-size: 0.73rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; display: flex; align-items: center; gap: 7px; }
+  .key-status { font-size: 0.72rem; color: #4caf50; text-transform: none; font-weight: 600; letter-spacing: 0; }
+  .key-row { display: flex; gap: 8px; }
+  .key-row input { flex: 1; }
+  .key-clear-btn { background: none; border: 1px solid var(--danger); color: var(--danger); border-radius: 6px; padding: 0 10px; font-size: 0.75rem; cursor: pointer; white-space: nowrap; transition: background 0.15s; }
+  .key-clear-btn:hover { background: var(--danger); color: #fff; }
+  .sfield input {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 12px; border-radius: 7px;
+    font-size: 0.88rem; outline: none;
+  }
+  .sfield input:focus { border-color: var(--accent); }
+  .settings-status { font-size: 0.82rem; margin-top: 10px; min-height: 20px; text-align: center; }
+  .btn-settings {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    padding: 6px 12px; border-radius: 7px; cursor: pointer; font-size: 0.85rem;
+    transition: all 0.15s;
+  }
+  .btn-settings:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Score breakdown ── */
+  .breakdown { display: flex; gap: 6px; margin-top: 10px; }
+  .breakdown-item { flex: 1; background: var(--surface2); border-radius: 8px; padding: 8px 10px; text-align: center; }
+  .breakdown-item .b-val { font-size: 1rem; font-weight: 700; }
+  .breakdown-item .b-lbl { font-size: 0.65rem; color: var(--muted); margin-top: 1px; }
+
+  /* ── Summary cards (salary / remote / benefits) ── */
+  .sum-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .sum-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 10px 8px; text-align: center; }
+  .sum-card .sum-icon { font-size: 1.1rem; }
+  .sum-card .sum-title { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); margin: 3px 0 5px; }
+  .sum-card .sum-val { font-size: 0.82rem; font-weight: 700; color: var(--text); word-break: break-word; line-height: 1.3; }
+  .sum-card .sum-note { font-size: 0.66rem; color: var(--muted); margin-top: 4px; line-height: 1.3; }
+
+  /* ── Signals grid (green | red) ── */
+  .signals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .signals-col-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 5px; }
+  .signals-col-label.green { color: var(--accent2); }
+  .signals-col-label.red   { color: #e57373; }
+
+  /* ── Scrollbar ── */
+  /* Wider, easier-to-grab scrollbars on the scrolling panels */
+  .jobs-panel::-webkit-scrollbar,
+  .right-panel::-webkit-scrollbar { width: 14px; }
+  .jobs-panel::-webkit-scrollbar-track,
+  .right-panel::-webkit-scrollbar-track { background: var(--surface); }
+  .jobs-panel::-webkit-scrollbar-thumb,
+  .right-panel::-webkit-scrollbar-thumb {
+    background: var(--accent); border-radius: 7px; border: 3px solid var(--surface); min-height: 40px;
+  }
+  .jobs-panel::-webkit-scrollbar-thumb:hover,
+  .right-panel::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
+  .jobs-panel, .right-panel { scrollbar-width: auto; scrollbar-color: var(--accent) var(--surface); }
+
+  @media (max-width: 700px) {
+    .main { flex-direction: column; height: auto; }
+    .jobs-panel { border-right: none; border-bottom: 1px solid var(--border); max-height: 60vh; }
+    .right-panel { min-height: 50vh; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Job <span>Analyser</span></h1>
+    <div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">LinkedIn intelligence</div>
+  </div>
+  <span class="badge">BETA</span>
+  <div class="view-tabs">
+    <button id="tabSearch" class="view-tab active" onclick="showSearch()">🔍 Search</button>
+    <button id="tabHistory" class="view-tab" onclick="showHistory()">📚 Job Library</button>
+    <button id="tabFavorites" class="view-tab" onclick="showFavorites()">⭐ Favorites <span id="favCount">(0)</span></button>
+  </div>
+  <div id="serverStatus" style="margin-left:auto;display:flex;align-items:center;gap:12px;font-size:0.8rem;color:var(--muted)">
+    <span id="statusDot" style="width:8px;height:8px;border-radius:50%;background:var(--border);display:inline-block"></span>
+    <span id="statusText">Checking server…</span>
+    <button class="btn-settings" onclick="openSettings()" title="Login settings">⚙️ Settings</button>
+  </div>
+</header>
+
+<!-- Settings Modal -->
+<div class="settings-backdrop" id="settingsModal" onclick="if(event.target===this)closeSettings()">
+  <div class="settings-modal">
+    <button class="settings-close" onclick="closeSettings()">✕</button>
+    <h2>⚙️ Settings</h2>
+    <p class="sub">Guest mode — no LinkedIn login needed. Only the optional AI key is stored, locally on this machine.</p>
+
+    <div class="sfield">
+      <label>Gemini API Key <span style="color:var(--muted);font-size:0.7rem;text-transform:none;font-weight:400">(AI summaries ✨ — free at <a href="https://aistudio.google.com" target="_blank" style="color:var(--accent)">aistudio.google.com</a>)</span><span id="groq-status" class="key-status" style="display:none">✅ Saved</span></label>
+      <div class="key-row">
+        <input id="sGroq" type="password" placeholder="AIza…"/>
+        <button id="groq-clear" class="key-clear-btn" style="display:none" onclick="clearApiKey('gemini_key','groq-status','groq-clear','sGroq','AIza…')">✕ Clear</button>
+      </div>
+    </div>
+
+    <button class="btn" style="width:100%;margin-top:4px" onclick="saveSettings()">Save AI Key</button>
+    <div class="settings-status" id="settingsStatus"></div>
+
+    <div id="aiToggleRow" style="display:none;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.82rem">
+      <span id="aiToggleLabel"></span>
+      <button id="aiToggleBtn" class="key-clear-btn" onclick="toggleAi()"></button>
+    </div>
+
+    <div style="margin-top:12px;padding:11px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:0.78rem;color:var(--muted);line-height:1.6">
+      <b style="color:var(--text)">Get a free key in ~1 minute:</b><br>
+      1. Open <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a> and sign in with a Google account.<br>
+      2. Click <b style="color:var(--text)">Create API key</b>, then copy it.<br>
+      3. Paste it above and hit <b style="color:var(--text)">Save AI Key</b>.<br>
+      <span style="color:var(--accent2)">🔒 Free tier, stored only on this computer, sent only to Google — never to us.</span>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:18px 0 0;padding-top:16px">
+      <label style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Data</label>
+      <p class="sub" style="margin:6px 0 10px" id="dataStats">All fetched jobs, AI summaries and favorites are stored locally.</p>
+      <button class="btn" style="width:100%;background:var(--danger)" onclick="resetEverything()">🗑 Reset everything</button>
+      <div class="settings-status" id="resetStatus"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Search Section -->
+<div class="search-section">
+  <div class="search-row">
+    <input name="query" type="text" placeholder="Job title, keyword…" value="Product Owner"/>
+    <input name="location" type="text" placeholder="City or country" value="Lisbon"/>
+    <select name="posted_within" title="Only show jobs posted within this window">
+      <option value="r86400" selected>Past 24 hours</option>
+      <option value="r604800">Past week</option>
+      <option value="r2592000">Past month</option>
+      <option value="">Any time</option>
+    </select>
+    <button class="btn" id="searchBtn" onclick="doSearch()">🔍 Search Jobs</button>
+    <button class="btn auto-toggle" id="autoBtn" onclick="toggleAuto()"
+            title="Keep this search running in the background — re-checks every 30 min and collects new jobs, fully analyzed, into your library.">⚡ Auto: Off</button>
+  </div>
+  <div class="search-opts">
+    <label class="exact-toggle" title="Off = also search related titles (synonyms + Senior/Junior). On = only the exact title you typed.">
+      <input type="checkbox" id="exactMatch"> Exact match only
+    </label>
+    <span id="searchVariants" class="search-variants" style="display:none"></span>
+  </div>
+  <div id="autoStatus" class="auto-status" style="display:none"></div>
+</div>
+
+<!-- Filters -->
+<div class="filters-row">
+  <span class="filter-label">Filter:</span>
+  <span class="filter-chip active" data-filter="all" onclick="setFilter('all',this)">All</span>
+  <span class="filter-chip" data-filter="remote" onclick="setFilter('remote',this)">🌐 Remote</span>
+  <span class="filter-chip" data-filter="hybrid" onclick="setFilter('hybrid',this)">🏙 Hybrid</span>
+  <span class="filter-chip" data-filter="onsite" onclick="setFilter('onsite',this)">🏢 On-site</span>
+</div>
+
+<!-- Main Layout -->
+<div class="main">
+  <div class="jobs-panel" id="jobsPanel">
+    <div class="state-box">
+      <div class="icon">🔍</div>
+      <p>Search for jobs above, or load demo data to explore the platform.</p>
+    </div>
+  </div>
+  <div class="right-panel" id="companyPanel">
+    <div class="company-empty">
+      <div class="icon">👆</div>
+      <p>Select a job to see company insights</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────
+let allJobs = [];
+let filteredJobs = [];
+let activeFilter = 'all';
+let _currentSource = null;   // active EventSource (streaming search)
+let _jobIdCounter  = 0;      // monotonic ID for SSE-delivered jobs
+let selectedJob = null;
+
+// ─── Pagination / "Load more" + "Load all" state ──────────
+let _jobIdSet        = new Set();  // jobIds already in allJobs (de-dupe across loads)
+let _feedOffset      = 0;          // how many feed cards we've requested (next "Load more" start)
+let _feedExhausted   = false;      // the feed returned nothing new — hide "Load more"
+let _weekFullyLoaded = false;      // "Load all (past week)" finished — hide both buttons
+let _loadState       = 'idle';     // 'idle' | 'loading' — drives the footer controls
+let _loadLabel       = '';
+let _newCount        = 0;          // how many jobs in this fetch were new (not seen before)
+let _horizonDays     = 0;          // how far back (days) we've swept via Load all / +week / +month
+let _loadedAllMode   = false;      // true once a time-sweep ran — switch footer to horizon controls
+
+// ─── Favorites / view state ───────────────────────────────
+let viewMode = 'search';        // 'search' | 'history' | 'favorites'
+let favJobs  = [];              // jobs shown in the Favorites view
+let libJobs  = [];              // jobs shown in the History view (whole fetched library)
+const _favIds = new Set();      // stable LinkedIn jobIds that are favorited
+
+// ─── HTML escaping (prevents XSS from job data & AI output) ─
+function esc(v) {
+  if (v == null) return '';
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Turn a flattened job description (newline-separated, bullets marked with "• "
+// by the server — or, for older cached jobs, lines that simply end in ";") into
+// clean, readable HTML: bold section headings, real bullet lists, spaced
+// paragraphs. Works for both new and previously-cached descriptions, so nothing
+// needs re-fetching. All text is escaped — only our own fixed tags are emitted.
+function formatJD(raw) {
+  if (!raw) return '';
+  const KNOWN = /^(our purpose|title and summary|overview|summary|responsibilities|key responsibilities|what you|you (should|will|'?ll)|in this role|as (the|a|an)\b|it would also be great if|our teams and values|corporate security responsibility|qualifications|requirements|about( the| us| the team)?|the role|role|benefits|what we offer|skills|experience|who you are|we offer|nice to have|preferred|minimum|basic)/i;
+  const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  let html = '', inList = false;
+  const close = () => { if (inList) { html += '</ul>'; inList = false; } };
+  for (const ln of lines) {
+    const m = ln.match(/^[•\-·*]\s+(.*)$/);
+    const endsSemi = /;$/.test(ln);
+    if (m || endsSemi) {
+      const t = m ? m[1] : ln;
+      if (!inList) { html += '<ul class="jd-ul">'; inList = true; }
+      html += '<li>' + esc(t) + '</li>';
+      continue;
+    }
+    close();
+    const words = ln.split(/\s+/).length;
+    const isHead = ln.length <= 70 && !/[.!?,]$/.test(ln) && (KNOWN.test(ln) || words <= 7);
+    html += isHead ? '<div class="jd-h">' + esc(ln) + '</div>'
+                   : '<p class="jd-p">' + esc(ln) + '</p>';
+  }
+  close();
+  return html;
+}
+
+// ─── Server Status ───────────────────────────────────────
+let serverOnline = false;
+let aiConfigured = false;          // is a Gemini key set? (drives the AI banner + placeholders)
+let _aiBannerDismissed = false;    // dismissed for this session only
+
+async function checkServer() {
+  try {
+    const res = await fetch('http://localhost:5000/health', { signal: AbortSignal.timeout(2000) });
+    if (res.ok) {
+      const data = await res.json();
+      serverOnline = true;
+      const aiOk = !!data.anthropic_configured;
+      aiConfigured = aiOk;
+      document.getElementById('statusDot').style.background = '#00c9a7';
+      document.getElementById('statusText').textContent =
+        `🟢 Guest mode${aiOk ? ' + ✨ AI' : (data.ai_disabled ? ' · ⏸ AI paused' : '')}`;
+      // Don't nag to add a key if one exists but is just paused.
+      updateAiBanner(aiOk || !!data.ai_disabled);
+      return true;
+    }
+  } catch (e) { /* server not running */ }
+  serverOnline = false;
+  const ab = document.getElementById('aiBanner'); if (ab) ab.remove();   // server-offline message takes over
+  document.getElementById('statusDot').style.background = '#e74c3c';
+  document.getElementById('statusText').textContent = '🔴 Server offline — start start.bat';
+  return false;
+}
+
+// Soft, dismissible banner shown only when no Gemini key is set. Self-clears once a key is added.
+function updateAiBanner(aiOk) {
+  let b = document.getElementById('aiBanner');
+  if (aiOk || _aiBannerDismissed) { if (b) b.remove(); return; }
+  if (b) return;                                   // already showing
+  b = document.createElement('div');
+  b.id = 'aiBanner';
+  b.style.cssText = 'display:flex;align-items:center;gap:12px;justify-content:center;flex-wrap:wrap;'
+    + 'background:linear-gradient(90deg,#1a1f3a,#241a3a);border-bottom:1px solid var(--border);'
+    + 'color:var(--text);padding:9px 16px;font-size:0.84rem';
+  b.innerHTML = '<span>⚡ <b>Unlock AI</b> — add a free Gemini API key for summaries, skill extraction &amp; salary estimates.</span>'
+    + '<button onclick="openSettings()" style="background:var(--accent);color:#fff;border:none;padding:5px 12px;'
+    + 'border-radius:7px;font-size:0.8rem;cursor:pointer;white-space:nowrap">Add key →</button>'
+    + '<button onclick="dismissAiBanner()" title="Dismiss" style="background:none;border:none;color:var(--muted);'
+    + 'cursor:pointer;font-size:1rem;line-height:1">✕</button>';
+  const anchor = document.querySelector('.search-section');
+  if (anchor) anchor.before(b); else document.body.prepend(b);
+}
+
+function dismissAiBanner() {
+  _aiBannerDismissed = true;
+  const b = document.getElementById('aiBanner'); if (b) b.remove();
+}
+
+// Check on load and every 10s
+checkServer();
+setInterval(checkServer, 10000);
+loadFavIds();   // load which jobs are starred (for the ⭐ on cards + the count)
+
+// ─── Auto-search (background collector) ───────────────────
+let _autoSearches   = [];
+let _autoIntervalMin = 30;
+
+function _curAutoKey() {
+  const q = (document.querySelector('input[name=query]')?.value || '').trim().toLowerCase();
+  const l = (document.querySelector('input[name=location]')?.value || '').trim().toLowerCase();
+  const t = document.querySelector('select[name=posted_within]')?.value || '';
+  return `${q}|${l}|${t}`;
+}
+
+function _agoText(ts) {
+  if (!ts) return 'soon';
+  const s = Math.max(0, Date.now() / 1000 - ts);
+  if (s < 90)   return 'just now';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  return Math.round(s / 3600) + 'h ago';
+}
+
+async function toggleAuto() {
+  if (!serverOnline) { showError('Server offline — start start.bat first.'); return; }
+  const query    = (document.querySelector('input[name=query]')?.value || '').trim();
+  if (!query) { showError('Enter a search first, then turn on Auto.'); return; }
+  const location = (document.querySelector('input[name=location]')?.value || '').trim();
+  const tpr      = document.querySelector('select[name=posted_within]')?.value || '';
+  const key      = _curAutoKey();
+  const isActive = _autoSearches.some(s => s.active && s.key === key);
+  try {
+    if (isActive) {
+      await fetch('http://localhost:5000/auto/stop', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+    } else {
+      await fetch('http://localhost:5000/auto/start', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, location, tpr }) });
+    }
+  } catch (e) { /* ignore */ }
+  refreshAutoStatus();
+}
+
+async function refreshAutoStatus() {
+  try {
+    const res = await fetch('http://localhost:5000/auto/status');
+    if (!res.ok) return;
+    const data = await res.json();
+    _autoSearches    = data.searches || [];
+    _autoIntervalMin = data.interval_min || 30;
+  } catch (e) { return; }
+  _renderAutoUI();
+}
+
+function _renderAutoUI() {
+  const active = _autoSearches.filter(s => s.active);
+  const mine   = active.find(s => s.key === _curAutoKey());
+  const btn = document.getElementById('autoBtn');
+  if (btn) {
+    btn.classList.toggle('on', !!mine);
+    btn.textContent = mine ? '⚡ Auto: On' : '⚡ Auto: Off';
+  }
+  const st = document.getElementById('autoStatus');
+  if (!st) return;
+  if (!active.length) { st.style.display = 'none'; st.innerHTML = ''; return; }
+  st.style.display = '';
+  st.innerHTML = active.map(s =>
+    `<span class="auto-pill">⚡ ${esc(s.query)}${s.location ? ' · ' + esc(s.location) : ''}`
+    + ` · every ${_autoIntervalMin}m · last ${_agoText(s.last_run_at)} · +${s.new_today || 0} today`
+    + ` <a onclick="_stopAuto('${encodeURIComponent(s.key)}')" title="Stop">✕</a></span>`).join('');
+}
+
+async function _stopAuto(encKey) {
+  try {
+    await fetch('http://localhost:5000/auto/stop', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: decodeURIComponent(encKey) }) });
+  } catch (e) {}
+  refreshAutoStatus();
+}
+
+refreshAutoStatus();
+setInterval(refreshAutoStatus, 30000);
+
+// ─── Settings Modal ───────────────────────────────────────
+function openSettings() {
+  document.getElementById('settingsStatus').textContent = '';
+
+  // Show/hide saved badges + clear buttons based on current server state
+  function setKeyState(statusId, clearBtnId, inputId, defaultPlaceholder, isSaved) {
+    document.getElementById(statusId).style.display  = isSaved ? '' : 'none';
+    document.getElementById(clearBtnId).style.display = isSaved ? '' : 'none';
+    document.getElementById(inputId).placeholder = isSaved ? 'Leave blank to keep current key' : defaultPlaceholder;
+    document.getElementById(inputId).value = '';
+  }
+  fetch('http://localhost:5000/health').then(r => r.json()).then(data => {
+    setKeyState('groq-status', 'groq-clear', 'sGroq', 'gsk_…', data.has_key);   // a paused key is still "saved"
+    _renderAiToggle(data.has_key, data.ai_disabled);
+  }).catch(() => {});
+
+  document.getElementById('settingsModal').classList.add('open');
+  document.getElementById('sGroq').focus();
+}
+
+// Pause/resume AI (keeps the key) — so testing doesn't spend Gemini quota.
+function _renderAiToggle(hasKey, disabled) {
+  const row = document.getElementById('aiToggleRow');
+  if (!row) return;
+  if (!hasKey) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  document.getElementById('aiToggleLabel').innerHTML = disabled
+    ? '⏸ AI is <b>paused</b> — key kept, no Gemini calls'
+    : '✨ AI is <b>on</b>';
+  document.getElementById('aiToggleBtn').textContent = disabled ? '▶ Resume AI' : '⏸ Pause AI';
+}
+
+async function toggleAi() {
+  try {
+    const h = await (await fetch('http://localhost:5000/health')).json();
+    const enable = !!h.ai_disabled;   // currently paused → enable; otherwise pause
+    const res = await fetch('http://localhost:5000/config/ai-toggle', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: enable }) });
+    const d = await res.json();
+    _renderAiToggle(h.has_key, !d.ai_enabled);
+    checkServer();   // refresh the header status + AI banner
+  } catch (e) { /* ignore */ }
+}
+
+async function clearApiKey(keyName, statusId, clearBtnId, inputId, defaultPlaceholder) {
+  const btn = document.getElementById(clearBtnId);
+  btn.textContent = '…'; btn.disabled = true;
+  try {
+    const res = await fetch('http://localhost:5000/config/clear-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: keyName }),
+    });
+    if (res.ok) {
+      document.getElementById(statusId).style.display  = 'none';
+      document.getElementById(clearBtnId).style.display = 'none';
+      document.getElementById(inputId).placeholder = defaultPlaceholder;
+      document.getElementById(inputId).value = '';
+      checkServer();
+    }
+  } catch (e) {}
+  btn.textContent = '✕ Clear'; btn.disabled = false;
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+// Wipe the local database (cached jobs + AI + favorites) and all client state.
+async function resetEverything() {
+  if (!confirm('This permanently erases ALL cached jobs, AI summaries and favorites — a clean slate.\n\nYour Gemini API key is kept. Continue?')) return;
+  const status = document.getElementById('resetStatus');
+  status.style.color = 'var(--muted)'; status.textContent = 'Resetting…';
+  try {
+    const res = await fetch('http://localhost:5000/data/reset', { method: 'POST' });
+    if (!res.ok) throw new Error();
+  } catch (e) {
+    status.style.color = 'var(--danger)'; status.textContent = 'Could not reach server.'; return;
+  }
+  // Clear client-side state too.
+  for (const k in _aiByJobId)     delete _aiByJobId[k];
+  for (const k in _detailLoaded)  delete _detailLoaded[k];
+  for (const k in _analysisCache) delete _analysisCache[k];
+  _favIds.clear(); _updateFavCount();
+  allJobs = []; filteredJobs = []; favJobs = []; selectedJob = null;
+  closeDetail();
+  if (viewMode === 'favorites') _renderFavEmpty();
+  else document.getElementById('jobsPanel').innerHTML =
+    `<div class="state-box"><div class="icon">🧹</div><p>Clean slate — everything cleared. Search for jobs above.</p></div>`;
+  status.style.color = 'var(--accent2)'; status.textContent = '✅ Everything cleared.';
+}
+
+async function saveSettings() {
+  const groq    = document.getElementById('sGroq').value.trim();
+  const status  = document.getElementById('settingsStatus');
+
+  // ── If server is offline, start it via the registered protocol ──
+  if (!serverOnline) {
+    status.style.color = 'var(--muted)';
+    status.textContent = '⏳ Starting server…';
+    window.location.href = 'jobanalyser://start';   // triggers start.bat
+
+    let attempts = 0;
+    await new Promise(resolve => {
+      const poll = setInterval(async () => {
+        attempts++;
+        const online = await checkServer();
+        if (online || attempts >= 15) { clearInterval(poll); resolve(); }
+      }, 2000);
+    });
+
+    if (!serverOnline) {
+      status.style.color = 'var(--danger)';
+      status.textContent = '❌ Server did not start. Run setup.bat first, then try again.';
+      return;
+    }
+  }
+
+  if (!groq) {
+    status.style.color = 'var(--accent2)';
+    status.textContent = '✅ Guest mode ready (no AI key set).';
+    setTimeout(closeSettings, 1200);
+    return;
+  }
+
+  status.style.color = 'var(--muted)';
+  status.textContent = 'Saving AI key…';
+  try {
+    const res = await fetch('http://localhost:5000/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gemini_key: groq }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      status.style.color = 'var(--danger)';
+      status.textContent = data.error || 'Failed to save key.';
+      return;
+    }
+    status.style.color = 'var(--accent2)';
+    status.textContent = data.anthropic_configured ? '✅ AI key saved.' : '✅ Saved.';
+    checkServer();
+    setTimeout(closeSettings, 1500);
+  } catch (e) {
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Could not reach server.';
+  }
+}
+
+// ─── Country Detection ────────────────────────────────────
+const CITY_COUNTRY = {
+  'lisbon':'pt','porto':'pt','portugal':'pt',
+  'london':'gb','manchester':'gb','birmingham':'gb','uk':'gb','england':'gb','edinburgh':'gb','glasgow':'gb',
+  'berlin':'de','munich':'de','hamburg':'de','frankfurt':'de','germany':'de','cologne':'de',
+  'paris':'fr','lyon':'fr','france':'fr','marseille':'fr',
+  'amsterdam':'nl','netherlands':'nl','rotterdam':'nl','nl':'nl',
+  'madrid':'es','barcelona':'es','spain':'es','seville':'es','valencia':'es',
+  'rome':'it','milan':'it','italy':'it','florence':'it',
+  'dublin':'ie','ireland':'ie',
+  'zurich':'ch','switzerland':'ch','geneva':'ch',
+  'stockholm':'se','sweden':'se','gothenburg':'se',
+  'oslo':'no','norway':'no',
+  'copenhagen':'dk','denmark':'dk',
+  'helsinki':'fi','finland':'fi',
+  'warsaw':'pl','poland':'pl','krakow':'pl',
+  'prague':'cz','czech':'cz','brno':'cz',
+  'budapest':'hu','hungary':'hu',
+  'vienna':'at','austria':'at',
+  'brussels':'be','belgium':'be','antwerp':'be',
+  'toronto':'ca','vancouver':'ca','canada':'ca','montreal':'ca',
+  'sydney':'au','melbourne':'au','australia':'au','brisbane':'au',
+  'singapore':'sg',
+  'dubai':'ae','uae':'ae','abu dhabi':'ae',
+};
+function detectCountry(loc) {
+  const l = loc.toLowerCase();
+  for (const [city, code] of Object.entries(CITY_COUNTRY)) {
+    if (l.includes(city)) return code;
+  }
+  return null;
+}
+
+// ─── Search ───────────────────────────────────────────────
+// forceFresh = true bypasses the server's 10-min cache for a live re-fetch.
+function doSearch(forceFresh = false) {
+  const query    = document.querySelector('input[name=query]').value.trim();
+  const location = document.querySelector('input[name=location]').value.trim();
+
+  if (!query) { showError('Please enter a job title or keyword.'); return; }
+
+  // Close any in-flight stream from a previous search
+  if (_currentSource) { _currentSource.close(); _currentSource = null; }
+  _cancelEnrichment();   // stop any enrichment still running for the previous search
+
+  if (!serverOnline) {
+    showError('LinkedIn server is not running. Double-click start.bat to start it, then try again.');
+    return;
+  }
+
+  // Reset state
+  allJobs        = [];
+  filteredJobs   = [];
+  _jobIdCounter  = 0;
+  _jobIdSet        = new Set();
+  _feedOffset      = 0;
+  _feedExhausted   = false;
+  _weekFullyLoaded = false;
+  _loadState       = 'loading';
+  _newCount        = 0;
+  _horizonDays     = 0;
+  _loadedAllMode   = false;
+  hideBanner();
+  _showStreamingUI(query);   // clears card list, shows "Searching…"
+
+  // Always do a live fetch so we genuinely check LinkedIn for new postings. Jobs we've
+  // seen before still render instantly (their detail + AI are cached), and only truly new
+  // ones get enriched/analysed — so this is cheap. The server flags each job as _new.
+  const tpr = (document.querySelector('select[name=posted_within]') || {}).value || '';
+  const exact = document.getElementById('exactMatch')?.checked;   // off ⇒ expand to related titles
+  // The dropdown window becomes a full sweep cutoff: page every variant until jobs cross it.
+  const cutoffDays = _cutoffForWindow(tpr);
+  _horizonDays = cutoffDays;
+  const sv = document.getElementById('searchVariants'); if (sv) { sv.style.display = 'none'; sv.textContent = ''; }
+  const params = new URLSearchParams({ q: query, force: '1', cutoff: String(cutoffDays) });
+  if (!exact) params.append('expand', '1');
+  if (location) params.append('location', location);
+  if (tpr) params.append('tpr', tpr);
+  params.append('_t', Date.now());   // cache-buster: stop the browser replaying a cached SSE response
+
+  _currentSource = new EventSource(`http://localhost:5000/stream?${params}`);
+
+  _currentSource.onmessage = (e) => {
+    let data;
+    try { data = JSON.parse(e.data); } catch { return; }
+
+    if (data.__error__) {
+      _currentSource.close(); _currentSource = null;
+      serverOnline = false;
+      document.getElementById('statusDot').style.background = '#e74c3c';
+      document.getElementById('statusText').textContent = '🔴 Server offline';
+      showError(`Search error: ${data.__error__}. Restart start.bat and try again.`);
+      return;
+    }
+
+    if (data.__variants__) {                 // expansion: show related titles + nearby areas
+      const el = document.getElementById('searchVariants');
+      const extraT = (data.__variants__ || []).slice(1);
+      const extraL = (data.__locations__ || []).slice(1);
+      const parts = [];
+      if (extraT.length) parts.push('titles: ' + extraT.join(', '));
+      if (extraL.length) parts.push('nearby: ' + extraL.join(', '));
+      if (el && parts.length) {
+        el.textContent = '🔎 Also searching — ' + parts.join('  ·  ');
+        el.style.display = '';
+      }
+      return;
+    }
+
+    if (data.__progress__ !== undefined) {   // sweep progress: "Searching 4/11 · N jobs"
+      const el = document.getElementById('streamMsg');
+      if (el && data.steps) el.textContent = `Searching… ${data.step}/${data.steps} · ${allJobs.length} jobs so far`;
+      return;
+    }
+
+    if (data.__done__) {
+      _currentSource.close(); _currentSource = null;
+      _loadState = 'idle';
+      _loadedAllMode = true;               // the search already swept the window → show "+1 month"
+      if (allJobs.length === 0) {
+        showError(`No jobs found for "${query}"${location ? ` in ${location}` : ''}. Try a broader search.`);
+      } else {
+        _finaliseStreamingUI(false);
+        applyFilters();                    // refresh footer so the horizon controls appear
+        showBanner(_newCount
+          ? `➕ ${_newCount} new job${_newCount !== 1 ? 's' : ''} since you last searched this`
+          : '✓ Up to date — no new postings since last time');
+        _enrichAllInWaves();   // fills the whole list in waves, then runs AI at the end
+      }
+      return;
+    }
+
+    // New job arrived — map, de-dupe, add, render
+    if (data._new) _newCount++;
+    const job = _ingestJob(data);
+    if (job) { applyFilters(); _updateStreamingCount(); }
+  };
+
+  _currentSource.onerror = () => {
+    if (!_currentSource) return;   // already closed on __done__
+    _currentSource.close(); _currentSource = null;
+    if (allJobs.length === 0) {
+      showError('Connection lost. Restart start.bat and try again.');
+    } else {
+      _finaliseStreamingUI(false);
+    }
+  };
+}
+
+const LOAD_BLOCK = 40;   // cards per "Load more" block (matches server GUEST_PAGES*10)
+
+// Map a raw card, skip if we already have that jobId, push to allJobs. Returns the job or null.
+function _ingestJob(data) {
+  const jid = data.job_id || null;
+  if (jid && _jobIdSet.has(jid)) return null;   // already in the list (de-dupe across loads)
+  if (jid) _jobIdSet.add(jid);
+  const job = _mapRawJob(data, _jobIdCounter++);
+  allJobs.push(job);
+  return job;
+}
+
+// "Load more" — fetch the next block of (older) cards at the current offset.
+function loadMore() {
+  if (!serverOnline || _loadState === 'loading') return;
+  const query    = document.querySelector('input[name=query]').value.trim();
+  const location = document.querySelector('input[name=location]').value.trim();
+  const tpr      = (document.querySelector('select[name=posted_within]') || {}).value || '';
+  if (!query) return;
+  const params = new URLSearchParams({ q: query, start: String(_feedOffset) });
+  if (location) params.append('location', location);
+  if (tpr) params.append('tpr', tpr);
+  params.append('_t', Date.now());
+  _runAppendStream(params, { label: 'Loading more', all: false });
+}
+
+// Each dropdown window → its sweep cutoff in days. The server nests tighter windows below this.
+function _cutoffForWindow(tpr) {
+  return tpr === 'r86400' ? 1 : tpr === 'r604800' ? 7 : tpr === 'r2592000' ? 30 : 3650;
+}
+
+// Extend the window further back and re-sweep (same title/location expansion), appending new jobs.
+function loadOlderWeek()  { _loadHorizon(_horizonDays + 7); }
+function loadOlderMonth() { _loadHorizon(_horizonDays + 30); }
+
+function _loadHorizon(targetDays) {
+  if (!serverOnline || _loadState === 'loading') return;
+  const query    = document.querySelector('input[name=query]').value.trim();
+  const location = document.querySelector('input[name=location]').value.trim();
+  if (!query) return;
+  const exact = document.getElementById('exactMatch')?.checked;
+  const secs  = targetDays * 86400;
+  const params = new URLSearchParams({ q: query, tpr: 'r' + secs, cutoff: String(targetDays) });
+  if (!exact) params.append('expand', '1');
+  if (location) params.append('location', location);
+  params.append('_t', Date.now());
+  _runAppendStream(params, { label: `Sweeping last ${targetDays} days`, all: true, horizon: targetDays });
+}
+
+// Shared append-mode stream: keeps existing jobs, adds only new ones, renders once at the end.
+function _runAppendStream(params, opts) {
+  if (_currentSource) { _currentSource.close(); _currentSource = null; }
+  _cancelEnrichment();
+  const before = allJobs.length;
+  _newCount = 0;
+  _setLoadState('loading', opts.label + '…');
+  _currentSource = new EventSource(`http://localhost:5000/stream?${params}`);
+
+  _currentSource.onmessage = (e) => {
+    let data; try { data = JSON.parse(e.data); } catch { return; }
+
+    if (data.__error__) {
+      _currentSource.close(); _currentSource = null;
+      _setLoadState('idle');
+      showBanner(`⚠ ${data.__error__}`);
+      return;
+    }
+    if (data.__variants__) {                 // expansion info during an append sweep — show it, don't ingest
+      const el = document.getElementById('searchVariants');
+      const extraT = (data.__variants__ || []).slice(1);
+      const extraL = (data.__locations__ || []).slice(1);
+      const parts = [];
+      if (extraT.length) parts.push('titles: ' + extraT.join(', '));
+      if (extraL.length) parts.push('nearby: ' + extraL.join(', '));
+      if (el && parts.length) { el.textContent = '🔎 Also searching — ' + parts.join('  ·  '); el.style.display = ''; }
+      return;
+    }
+    if (data.__progress__ !== undefined) {
+      const at = data.steps ? `${data.step}/${data.steps} · ` : '';
+      _setLoadState('loading', `${opts.label}… ${at}${_newCount} new`);
+      return;
+    }
+    if (data.__done__) {
+      _currentSource.close(); _currentSource = null;
+      const added = allJobs.length - before;   // grew the visible list? (drives "exhausted")
+      if (opts.horizon) {                       // time-sweep: remember how far back we've gone
+        _horizonDays = opts.horizon;
+        _loadedAllMode = true;
+        _feedOffset = Math.max(_feedOffset, allJobs.length);
+      } else if (added === 0) { _feedExhausted = true; }
+      else { _feedOffset += LOAD_BLOCK; }
+      _loadState = 'idle';
+      applyFilters();        // one render with all the new cards + refreshed footer
+      showBanner(_newCount ? `➕ ${_newCount} new job${_newCount !== 1 ? 's' : ''} added` : '✓ No new jobs — you’re up to date');
+      _enrichAllInWaves();   // enriches only the new ones (cached jobs are skipped)
+      return;
+    }
+    if (data._new) _newCount++;
+    _ingestJob(data);        // collect quietly; we render once at __done__
+  };
+
+  _currentSource.onerror = () => {
+    if (!_currentSource) return;
+    _currentSource.close(); _currentSource = null;
+    _setLoadState('idle');
+    applyFilters();
+  };
+}
+
+// Footer controls under the job list (search view only). Pure function of load state.
+function _loadControlsHtml() {
+  if (viewMode !== 'search' || filteredJobs.length === 0) return '';
+  if (_loadState === 'loading') {
+    return `<div id="loadControls" class="load-controls"><span class="load-spin"></span><span>${esc(_loadLabel || 'Loading…')}</span></div>`;
+  }
+  if (!_loadedAllMode) return '';          // wait until the first sweep finishes
+  // The search already swept the chosen window; offer to extend further back in time.
+  const span = _horizonDays >= 30
+    ? `Loaded last ${Math.round(_horizonDays / 30)} month${_horizonDays >= 60 ? 's' : ''}`
+    : `Loaded last ${_horizonDays} days`;
+  const inner = `<span class="load-allset">${span}</span>`
+    + `<button class="load-btn" onclick="loadOlderWeek()">+ 1 week</button>`
+    + `<button class="load-btn alt" onclick="loadOlderMonth()">+ 1 month</button>`;
+  return `<div id="loadControls" class="load-controls">${inner}</div>`;
+}
+
+// Update just the footer without a full re-render (used during streaming).
+function _setLoadState(state, label) {
+  _loadState = state;
+  if (label !== undefined) _loadLabel = label;
+  const el = document.getElementById('loadControls');
+  if (el) el.outerHTML = _loadControlsHtml();
+}
+
+// ── Streaming UI helpers ───────────────────────────────────
+function _showStreamingUI(query) {
+  const panel = document.getElementById('jobsPanel');
+  panel.innerHTML = `
+    <div id="streamStatus" style="padding:20px;text-align:center;color:var(--muted)">
+      <div style="font-size:1.4rem;margin-bottom:8px">🔍</div>
+      <div id="streamMsg" style="font-size:0.9rem">Searching LinkedIn for <strong>${query}</strong>…</div>
+      <div id="streamCount" style="font-size:0.78rem;margin-top:6px;color:var(--accent)"></div>
+    </div>`;
+}
+
+function _updateStreamingCount() {
+  const el = document.getElementById('streamCount');
+  if (el) el.textContent = `${allJobs.length} job${allJobs.length !== 1 ? 's' : ''} found so far…`;
+}
+
+function _finaliseStreamingUI(fromCache) {
+  const el = document.getElementById('streamStatus');
+  if (el) el.remove();
+  renderStats();
+  if (fromCache) showBanner('⚡ Results loaded from cache (< 1s)');
+}
+
+function showBanner(msg) {
+  let b = document.getElementById('searchBanner');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'searchBanner';
+    b.style.cssText = 'background:#2a1f0a;border:1px solid #7a5010;color:#f5c16c;padding:8px 16px;font-size:0.83rem;text-align:center';
+    document.querySelector('.filters-row').before(b);
+  }
+  b.textContent = msg;
+  b.style.display = 'block';
+}
+
+function hideBanner() {
+  const b = document.getElementById('searchBanner');
+  if (b) b.style.display = 'none';
+}
+
+
+// ─── Score Engine ─────────────────────────────────────────
+// Currency-aware annual salary benchmarks (top-quartile target)
+const SALARY_BENCHMARKS = {
+  USD: 130000, GBP: 90000,  EUR: 54000,  CHF: 130000,
+  CAD: 140000, AUD: 140000, SGD: 160000, AED: 480000,
+  PLN: 350000, CZK: 1800000, RON: 400000, SEK: 950000,
+  DKK: 650000, NOK: 950000,  HUF: 30000000,
+};
+
+function calcScore(job) {
+  // ── Salary (0–50 pts, piecewise vs market benchmark) ────
+  let salaryScore = 10; // undisclosed / no estimate penalty
+
+  const cur       = (job.salaryMin > 0 ? job.salaryCurrency : job.estSalaryCurrency) || 'EUR';
+  const benchmark = SALARY_BENCHMARKS[cur] || SALARY_BENCHMARKS.EUR;
+  let salMid = 0;
+
+  if (job.salaryMin > 0) {
+    salMid = (job.salaryMin + job.salaryMax) / 2;
+  } else if (job.estSalaryMin > 0) {
+    salMid = job.estSalaryMin; // use min only — conservative against LLM over-estimation
+  }
+
+  if (salMid > 0) {
+    const ratio = salMid / benchmark;
+    if      (ratio >= 1.2) salaryScore = 50;
+    else if (ratio >= 1.0) salaryScore = 35 + (ratio - 1.0) / 0.2 * 15; // 100–120% → 35–50
+    else if (ratio >= 0.8) salaryScore = 25 + (ratio - 0.8) / 0.2 * 10; // 80–100% → 25–35
+    else                   salaryScore = Math.max(0, ratio / 0.8 * 25);  // 0–80%   → 0–25
+  }
+
+  // ── Work type (0–25 pts) ─────────────────────────────────
+  const workScore = job.workType === 'remote' ? 25 : job.workType === 'hybrid' ? 12 : 0;
+
+  // ── Benefits / perks (0–25 pts) ──────────────────────────
+  // Prefer the AI-extracted perks (works in any language); fall back to a quick
+  // English keyword scan only when the job hasn't been analysed yet.
+  let matchedPerks = Array.isArray(job.aiPerks) ? job.aiPerks.slice() : null;
+  if (!matchedPerks) {
+    const desc = (job.description || '').toLowerCase();
+    const perks = [
+      'learning budget','training budget','professional development','equipment budget',
+      'home office','equity','stock option','rsu','health insurance','dental','pension',
+      'flexible hours','flexible working','parental leave','gym','wellness','mental health',
+      'unlimited pto','unlimited vacation','smart working','hybrid',
+    ];
+    matchedPerks = perks.filter(kw => desc.includes(kw));
+  }
+  const benefitScore = Math.min(matchedPerks.length / 4, 1) * 25;
+
+  const total = salaryScore + workScore + benefitScore;
+  return {
+    total:    Math.round(total),
+    salary:   Math.round(salaryScore),
+    workType: Math.round(workScore),
+    benefits: Math.round(benefitScore),
+    matchedPerks,
+  };
+}
+
+// ─── Process API Data ─────────────────────────────────────
+// Maps one raw server job → internal job object.
+// `id` is caller-supplied (index for batch, counter for SSE).
+function _mapRawJob(j, id) {
+  // Salary
+  let salaryMin = 0, salaryMax = 0, salaryCurrency = '$';
+  if (j.job_min_salary) salaryMin = j.job_min_salary;
+  if (j.job_max_salary) salaryMax = j.job_max_salary;
+  if (j.job_salary_currency) {
+    const cc = j.job_salary_currency;
+    salaryCurrency = cc === 'GBP' ? '£' : cc === 'EUR' ? '€' : cc === 'USD' ? '$' : cc;
+  }
+
+  // Days ago + raw timestamp for stable sort
+  const postedAt = j.job_posted_at_timestamp || null;
+  let daysAgo = null;
+  if (postedAt) {
+    daysAgo = Math.floor((Date.now()/1000 - postedAt) / 86400);
+  }
+
+  // Work type — use API field first, fallback to text parsing
+  let workType = 'onsite';
+  const wa = (j.work_arrangement || '').toLowerCase();
+  if (wa === 'remote' || j.job_is_remote) workType = 'remote';
+  else if (wa === 'hybrid') workType = 'hybrid';
+  else {
+    const title = (j.job_title || '').toLowerCase();
+    const desc  = (j.job_description || '').toLowerCase();
+    if (desc.includes('fully remote') || title.includes('remote')) workType = 'remote';
+    else if (desc.includes('hybrid') || title.includes('hybrid')) workType = 'hybrid';
+  }
+
+  const job = {
+    id,
+    jobId: j.job_id || null,
+    title: j.job_title || 'Unknown Title',
+    company: j.employer_name || 'Unknown Company',
+    companyLogo: j.employer_logo || null,
+    companyWebsite: j.employer_website || null,
+    location: [j.job_city, j.job_country].filter(Boolean).join(', ') || 'Unknown',
+    city: j.job_city || '',
+    country: j.job_country || '',
+    lat: j.job_latitude || null,
+    lng: j.job_longitude || null,
+    salaryMin, salaryMax, salaryCurrency,
+    empType: j.job_employment_type || '',
+    workType,
+    workTypeInferred: j.work_type_inferred || false,
+    postedAt,
+    postedRelative: j.job_posted_relative || null,
+    daysAgo,
+    url: j.job_apply_link || j.job_google_link || '#',
+    applyOptions: j.apply_options || [],
+    source: j.job_publisher || 'LinkedIn',
+    description: j.job_description || '',
+    seniority: j.seniority_level || null,
+    expYears: j.required_experience_years || null,
+    visaSponsorship: j.visa_sponsorship ?? null,
+    jobFunction: j.job_function || null,
+    industries: j.job_industries || null,
+    benefits: j.benefits_extended || (j.job_benefits || []).map(b => b.replace(/_/g,' ')),
+    technologies: [...(j.required_technologies || []), ...(j.preferred_technologies || [])],
+    softSkills: j.soft_skills || [],
+    methodologies: j.methodologies || [],
+    education: j.education_required || null,
+    highlights: j.job_highlights || {},
+  };
+  job.score = calcScore(job);
+  return job;
+}
+
+// Batch version (used by demo data / fallback)
+function processJobs(rawJobs) {
+  allJobs = rawJobs.map((j, i) => _mapRawJob(j, i));
+  applyFilters();
+  renderStats();
+}
+
+// ─── Filter & Render ──────────────────────────────────────
+function applyFilters() {
+  if (viewMode !== 'search') return;   // Favorites view owns the list; don't clobber it
+  filteredJobs = allJobs.filter(j => {
+    if (activeFilter !== 'all' && j.workType !== activeFilter) return false;
+    return true;
+  });
+  filteredJobs.sort((a, b) => {
+    const ta = a.postedAt ?? 0;
+    const tb = b.postedAt ?? 0;
+    if (tb !== ta) return tb - ta;              // newest first (higher timestamp = newer)
+    if (b.score.total !== a.score.total) return b.score.total - a.score.total;  // score tiebreaker
+    return (b.jobId || '').localeCompare(a.jobId || '');  // stable final tiebreaker
+  });
+  renderCards();
+  renderStats();
+}
+
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  applyFilters();
+}
+
+// ─── Stats Bar ────────────────────────────────────────────
+function renderStats() {
+  if (filteredJobs.length === 0) return;
+  const avgScore = Math.round(filteredJobs.reduce((s, j) => s + j.score.total, 0) / filteredJobs.length);
+  const withSalary = filteredJobs.filter(j => j.salaryMin > 0);
+  const avgSal = withSalary.length > 0
+    ? Math.round(withSalary.reduce((s, j) => s + (j.salaryMin + j.salaryMax) / 2, 0) / withSalary.length / 1000)
+    : null;
+
+  const el = document.getElementById('statsBar');
+  if (el) {
+    el.innerHTML = `
+      <div class="stat"><div class="stat-val">${filteredJobs.length}</div><div class="stat-lbl">Jobs Found</div></div>
+      <div class="stat"><div class="stat-val">${avgScore}</div><div class="stat-lbl">Avg Score</div></div>
+      ${avgSal ? `<div class="stat"><div class="stat-val">${filteredJobs[0].salaryCurrency}${avgSal}k</div><div class="stat-lbl">Avg Salary</div></div>` : ''}
+      <div class="stat"><div class="stat-val">${filteredJobs.filter(j=>j.workType==='remote').length}</div><div class="stat-lbl">Remote</div></div>
+    `;
+  }
+}
+
+// ─── Idempotent card pieces ───────────────────────────────
+// These render the salary chip and AI summary FROM the job object's stored
+// state, so re-rendering the card (e.g. each enrichment wave) reproduces the
+// estimate/summary instead of wiping them back to the base state.
+function _curSym(cur) {
+  return cur === 'GBP' ? '£' : cur === 'EUR' ? '€' : cur === 'USD' ? '$' : (cur || '') + ' ';
+}
+function _salaryChip(j) {
+  if (j.salaryMin > 0) {
+    const s = _curSym(j.salaryCurrency);
+    return `<span class="salary-chip" id="sal-${j.id}">${s}${Math.round(j.salaryMin/1000)}k – ${s}${Math.round(j.salaryMax/1000)}k</span>`;
+  }
+  if (j.estSalaryMin > 0) {
+    const s = _curSym(j.estSalaryCurrency || 'EUR');
+    const fmt = n => `${s}${Math.round(n/1000)}k`;
+    const note = j.estSalaryConfidence === 'low' ? ' est?' : ' est.';
+    return `<span class="salary-chip estimated" id="sal-${j.id}"><span title="AI salary estimate (${j.estSalaryConfidence} confidence)">~${fmt(j.estSalaryMin)}–${fmt(j.estSalaryMax)}</span><span style="font-size:0.7rem;opacity:0.65">${note}</span></span>`;
+  }
+  return `<span class="salary-chip unknown" id="sal-${j.id}">Salary not listed<button class="sal-est-btn" onclick="estimateSalary(event,${j.id})">💰 Estimate</button></span>`;
+}
+function _aiSummaryHtml(j) {
+  if (j.aiDo || j.aiNeed || j.aiFlag) {
+    return `<div class="ai-badge">✨ AI Summary</div>
+      <div class="ai-bullet"><span class="ai-icon">🎯</span><span>${esc(j.aiDo)   || '—'}</span></div>
+      <div class="ai-bullet"><span class="ai-icon">✅</span><span>${esc(j.aiNeed) || '—'}</span></div>
+      <div class="ai-bullet"><span class="ai-icon" style="color:var(--warn)">⚡</span><span style="color:var(--warn)">${esc(j.aiFlag) || '—'}</span></div>`;
+  }
+  const analyzing = (j.jobId && _aiInFlight[j.jobId]) || (_enrichActive && j.description);
+  if (analyzing) {
+    return `<div class="ai-trigger-btn ai-analyzing"><span class="load-spin"></span>✨ Analyzing…</div>`;
+  }
+  return `<button class="ai-trigger-btn" onclick="triggerSummary(event,${j.id})">✨ Summarise this job</button>`;
+}
+
+// ─── Cards ────────────────────────────────────────────────
+function renderCards() {
+  const panel = document.getElementById('jobsPanel');
+
+  if (filteredJobs.length === 0) {
+    panel.innerHTML = `<div class="state-box"><div class="icon">😶</div><p>No jobs match your filters. Try relaxing them.</p></div>`;
+    return;
+  }
+
+  const scoreClass = s => s >= 70 ? 'score-high' : s >= 45 ? 'score-mid' : 'score-low';
+  // LinkedIn's own relative time ("3 minutes ago") + absolute date when known.
+  const postedLabel = j => {
+    if (!j.postedAt && !j.postedRelative) return '';
+    const rel = j.postedRelative || (j.daysAgo === 0 ? 'today' : j.daysAgo + 'd ago');
+    if (!j.postedAt) return rel;
+    const date = new Date(j.postedAt * 1000).toLocaleDateString('en-GB',
+      { day: '2-digit', month: 'short', year: 'numeric' });
+    return `${rel} · ${date}`;
+  };
+  const formatSalary = j => j.salaryMin > 0
+    ? `${j.salaryCurrency}${Math.round(j.salaryMin/1000)}k – ${j.salaryCurrency}${Math.round(j.salaryMax/1000)}k`
+    : 'Salary not listed';
+  const workBadge = (w, url, jobId) => {
+    const label = w === 'remote' ? 'Remote' : w === 'hybrid' ? 'Hybrid' : 'On-site';
+    const cls   = w === 'remote' ? 'tag remote' : w === 'hybrid' ? 'tag hybrid' : 'tag';
+    // Use data-jobid + onclick so special chars in URLs can't break the href attribute
+    return `<a id="badge-${jobId}" href="#" target="_blank" onclick="event.stopPropagation(); openApply(${jobId})" class="${cls}" style="text-decoration:none" title="${label} (inferred from title/description) — click to open on LinkedIn">${label} ↗</a>`;
+  };
+
+  let html = `<div class="stats-bar" id="statsBar"></div>`;
+  if (viewMode === 'favorites' && filteredJobs.length) {
+    html += `<div class="fav-export-bar"><button id="favExportBtn" class="load-btn alt" onclick="exportFavoritesHtml()">⬇ Export all favorites</button></div>`;
+  }
+
+  filteredJobs.forEach(j => {
+    const sc = j.score;
+    const cls = scoreClass(sc.total);
+    html += `
+    <div class="job-card" id="card-${j.id}" onclick="selectJob(${j.id})">
+      <div class="card-top">
+        <div style="display:flex;align-items:flex-start;gap:10px;min-width:0">
+          ${j.companyLogo ? `<img src="${encodeURI(j.companyLogo)}" alt="" style="width:36px;height:36px;border-radius:6px;object-fit:contain;background:#fff;flex-shrink:0;margin-top:2px" onerror="this.style.display='none'">` : ''}
+          <div style="min-width:0">
+            <div class="company-name">${esc(j.company)}</div>
+            <div class="job-title">${esc(j.title)}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:6px;flex-shrink:0">
+          <button class="exp-btn" onclick="event.stopPropagation();exportJobHtml(event,${j.id})" title="Export as HTML">⬇</button>
+          <button class="fav-btn ${_isFav(j) ? 'on' : ''}" onclick="event.stopPropagation();toggleFavorite(${j.id})" title="Save to favorites">${_isFav(j) ? '★' : '☆'}</button>
+          <div class="score-badge ${cls}">
+            <div class="score-num">${sc.total}</div>
+            <div class="score-lbl">Score</div>
+          </div>
+        </div>
+      </div>
+      <div class="company-row">
+        ${workBadge(j.workType, j.url, j.id)}
+        ${_salaryChip(j)}
+        <span class="meta-pill">📍 ${esc(j.location)}</span>
+        ${(j.postedAt || j.postedRelative) ? `<span class="meta-pill" title="Posted ${esc(postedLabel(j))}">🕐 ${esc(postedLabel(j))}</span>` : ''}
+      </div>
+      ${(j.empType || j.seniority || j.jobFunction || j.industries || (j.aiPerks && j.aiPerks.length)) ? `
+      <ul class="card-fields">
+        ${j.empType ? `<li><span class="cf-ico">💼</span><span>${esc(j.empType)}</span></li>` : ''}
+        ${j.seniority ? `<li><span class="cf-ico">📈</span><span>${esc(j.seniority)}</span></li>` : ''}
+        ${j.jobFunction ? `<li><span class="cf-ico">🧩</span><span>${esc(j.jobFunction)}</span></li>` : ''}
+        ${j.industries ? `<li><span class="cf-ico">🏭</span><span>${esc(j.industries)}</span></li>` : ''}
+        ${(j.aiPerks && j.aiPerks.length) ? `<li><span class="cf-ico">🎁</span><span>${j.aiPerks.map(esc).join(' · ')}</span></li>` : ''}
+      </ul>` : ''}
+      <div class="card-ai-summary" id="ai-${j.id}">${_aiSummaryHtml(j)}</div>
+      <div class="card-desc-toggle" id="desc-toggle-${j.id}" onclick="toggleDesc(event,${j.id})">
+        <span>📋 Job Description</span><span>▾</span>
+      </div>
+      <div class="card-desc-content" id="desc-${j.id}">${j.description ? formatJD(j.description) : ''}</div>
+    </div>`;
+  });
+
+  html += _loadControlsHtml();
+  panel.innerHTML = html;
+  renderStats();
+}
+
+// ─── Apply link helper ────────────────────────────────────
+function openApply(id) {
+  const job = filteredJobs.find(j => j.id === id);
+  const url = (job && job.url && job.url !== '#') ? job.url : null;
+  if (url) window.open(url, '_blank');
+}
+
+// ─── Favorites ────────────────────────────────────────────
+function _isFav(j) { return j && j.jobId && _favIds.has(j.jobId); }
+
+function _updateFavCount() {
+  const el = document.getElementById('favCount');
+  if (el) el.textContent = `(${_favIds.size})`;
+}
+
+async function loadFavIds() {
+  try {
+    const res = await fetch('http://localhost:5000/favorites/ids');
+    if (!res.ok) return;
+    const data = await res.json();
+    _favIds.clear();
+    (data.ids || []).forEach(id => _favIds.add(String(id)));
+    _updateFavCount();
+    if (viewMode === 'search') renderCards();   // refresh stars on visible cards
+  } catch (e) { /* server offline — ignore */ }
+}
+
+async function toggleFavorite(id) {
+  const list = viewMode === 'favorites' ? favJobs : filteredJobs;
+  const job  = list.find(j => j.id === id);
+  if (!job || !job.jobId) return;
+  const wasFav = _favIds.has(job.jobId);
+  try {
+    if (wasFav) {
+      await fetch('http://localhost:5000/unfavorite', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: job.jobId }),
+      });
+      _favIds.delete(job.jobId);
+    } else {
+      await fetch('http://localhost:5000/favorite', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job }),
+      });
+      _favIds.add(job.jobId);
+    }
+  } catch (e) { return; }   // network error — leave state unchanged
+  _updateFavCount();
+
+  if (viewMode === 'favorites' && wasFav) {
+    favJobs = favJobs.filter(j => j.jobId !== job.jobId);   // removed → drop the card
+    filteredJobs = favJobs;
+    renderCards();
+    if (!favJobs.length) _renderFavEmpty();
+  } else if (viewMode === 'history') {
+    _histApply();   // re-render library rows so the ★ reflects
+  } else {
+    const card = document.getElementById('card-' + job.id);
+    const btn  = card && card.querySelector('.fav-btn');
+    if (btn) { const on = _favIds.has(job.jobId); btn.classList.toggle('on', on); btn.textContent = on ? '★' : '☆'; }
+  }
+}
+
+function _setViewTabs() {
+  document.getElementById('tabSearch').classList.toggle('active', viewMode === 'search');
+  document.getElementById('tabHistory').classList.toggle('active', viewMode === 'history');
+  document.getElementById('tabFavorites').classList.toggle('active', viewMode === 'favorites');
+}
+
+function showSearch() {
+  viewMode = 'search';
+  _setViewTabs();
+  document.querySelector('.search-section').style.display = '';
+  applyFilters();   // re-render the last search results
+}
+
+function _renderFavEmpty() {
+  document.getElementById('jobsPanel').innerHTML =
+    `<div class="state-box"><div class="icon">⭐</div><p>No favorites yet. Click the ☆ on any job to save it here — it stays even after the posting expires.</p></div>`;
+}
+
+async function showFavorites() {
+  // Stop any active search/enrichment so it can't clobber the favorites view.
+  if (_currentSource) { _currentSource.close(); _currentSource = null; }
+  _cancelEnrichment();
+  viewMode = 'favorites';
+  _setViewTabs();
+  document.querySelector('.search-section').style.display = 'none';
+  closeDetail();
+  const panel = document.getElementById('jobsPanel');
+  panel.innerHTML = `<div class="state-box"><div class="spinner"></div><p>Loading favorites…</p></div>`;
+  try {
+    const res = await fetch('http://localhost:5000/favorites');
+    const data = await res.json();
+    favJobs = (data.favorites || []).map((j, i) => ({ ...j, id: i, _detailDone: true }));
+  } catch (e) { favJobs = []; }
+  if (viewMode !== 'favorites') return;   // user switched back while loading
+  filteredJobs = favJobs;
+  selectedJob = null;
+  if (!favJobs.length) { _renderFavEmpty(); return; }
+  renderCards();
+}
+
+// ─── History (the whole fetched library) ──────────────────
+async function showHistory() {
+  // Stop any active search/enrichment so it can't clobber the history view.
+  if (_currentSource) { _currentSource.close(); _currentSource = null; }
+  _cancelEnrichment();
+  viewMode = 'history';
+  _setViewTabs();
+  document.querySelector('.search-section').style.display = 'none';
+  closeDetail();
+  const panel = document.getElementById('jobsPanel');
+  panel.innerHTML = `<div class="state-box"><div class="spinner"></div><p>Loading library…</p></div>`;
+  try {
+    const libRes = await fetch('http://localhost:5000/library');
+    const libData = await libRes.json();
+    libJobs = (libData.jobs || []).map((row, i) => {
+      const j = _mapRawJob(row, i);
+      if (row.ai && Object.keys(row.ai).length) _applyBatchResult(j, row.ai);
+      return j;
+    });
+  } catch (e) { libJobs = []; }
+  if (viewMode !== 'history') return;   // user switched back while loading
+  filteredJobs = libJobs;               // so selectJob / click-through works
+  selectedJob = null;
+  renderHistory();
+}
+
+function renderHistory() {
+  const panel = document.getElementById('jobsPanel');
+  const pending = libJobs.filter(j => !j.aiDo).length;   // jobs without AI yet
+  const analyzeBtn = pending
+    ? `<button id="analyzeAllBtn" class="load-btn alt" style="margin-left:auto;padding:5px 12px;font-size:0.8rem" onclick="analyzeLibrary()">✨ Analyze all (${pending})</button>`
+    : '';
+  panel.innerHTML = `
+    <div class="hist-title-row">📚 Analyzed Job Library <span class="hist-count">${libJobs.length} job${libJobs.length === 1 ? '' : 's'}</span>${analyzeBtn}</div>
+    <div class="hist-head">
+      <input id="histPos" class="hist-filter" type="text" placeholder="🔍 Position…"  oninput="_histApply()">
+      <input id="histCo"  class="hist-filter" type="text" placeholder="🏢 Company…"   oninput="_histApply()">
+      <input id="histLoc" class="hist-filter" type="text" placeholder="📍 Location…"  oninput="_histApply()">
+      <select id="histSort" class="hist-filter hist-sort" onchange="_histApply()">
+        <option value="date">Newest first</option>
+        <option value="score">Highest score</option>
+      </select>
+    </div>
+    <div id="histList" class="hist-list"></div>`;
+  _histApply();
+}
+
+function _histApply() {
+  const pos = (document.getElementById('histPos')?.value || '').trim().toLowerCase();
+  const co  = (document.getElementById('histCo')?.value  || '').trim().toLowerCase();
+  const loc = (document.getElementById('histLoc')?.value || '').trim().toLowerCase();
+  const sort = document.getElementById('histSort')?.value || 'date';
+  let rows = libJobs.filter(j =>
+    (!pos || (j.title    || '').toLowerCase().includes(pos)) &&
+    (!co  || (j.company  || '').toLowerCase().includes(co))  &&
+    (!loc || (j.location || '').toLowerCase().includes(loc)));
+  if (sort === 'score') {
+    rows = rows.slice().sort((a, b) => ((b.score && b.score.total) || 0) - ((a.score && a.score.total) || 0));
+  }   // 'date' keeps the server's newest-first order
+  const el = document.getElementById('histList');
+  if (!el) return;
+  if (!rows.length) {
+    el.innerHTML = `<div class="state-box"><div class="icon">📚</div><p>`
+      + (libJobs.length ? 'No jobs match your filters.'
+                        : 'Nothing analyzed yet. Run a search and the jobs collect here — beyond the 40-per-search limit.')
+      + `</p></div>`;
+    return;
+  }
+  el.innerHTML = rows.map(_historyRow).join('');
+}
+
+// Analyse every library job that doesn't have AI yet (fetches missing descriptions server-side).
+function analyzeLibrary() {
+  if (!aiConfigured) { showError('Resume AI in ⚙️ Settings first (it’s paused or no key).'); return; }
+  const btn = document.getElementById('analyzeAllBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Analyzing…'; }
+  const es = new EventSource('http://localhost:5000/analyse-library');
+  es.onmessage = (e) => {
+    let d; try { d = JSON.parse(e.data); } catch { return; }
+    if (d.__error__) { es.close(); if (btn) { btn.disabled = false; btn.textContent = '✨ Analyze all'; } showError(d.__error__); return; }
+    if (d.__total__ !== undefined) { if (btn) btn.textContent = `Analyzing 0/${d.__total__}…`; return; }
+    if (d.__progress__ !== undefined) { if (btn) btn.textContent = `Analyzing ${d.__progress__}/${d.total}…`; return; }
+    if (d.__done__) { es.close(); showHistory(); }   // reload library → AI + scores reflect
+  };
+  es.onerror = () => { es.close(); if (btn) { btn.disabled = false; btn.textContent = '✨ Analyze all'; } showHistory(); };
+}
+
+function _historyRow(j) {
+  const sc  = (j.score && j.score.total) || 0;
+  const cls = sc >= 70 ? 'score-high' : sc >= 45 ? 'score-mid' : 'score-low';
+  const wt  = j.workType === 'remote' ? 'Remote' : j.workType === 'hybrid' ? 'Hybrid' : 'On-site';
+  const date = j.postedRelative
+    || (j.postedAt ? new Date(j.postedAt * 1000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '');
+  const logo = j.companyLogo
+    ? `<img class="hist-logo" src="${encodeURI(j.companyLogo)}" onerror="this.style.visibility='hidden'">`
+    : `<div class="hist-logo"></div>`;
+  return `<div class="hist-row" onclick="selectJob(${j.id})">
+    <button class="hist-fav ${_isFav(j) ? 'on' : ''}" onclick="event.stopPropagation();toggleFavorite(${j.id})" title="Favorite">${_isFav(j) ? '★' : '☆'}</button>
+    ${logo}
+    <div class="hist-main">
+      <div class="hist-title">${esc(j.title)}</div>
+      <div class="hist-sub">${esc(j.company)}${j.location ? ' · ' + esc(j.location) : ''}</div>
+    </div>
+    <span class="hist-meta hist-wt-${j.workType}">${wt}</span>
+    <span class="hist-meta">${esc(date)}</span>
+    <span class="hist-score ${cls}">${sc}</span>
+    <button class="hist-exp" onclick="event.stopPropagation();exportJobHtml(event,${j.id})" title="Export as HTML">⬇</button>
+  </div>`;
+}
+
+// ─── Lazy detail loader ───────────────────────────────────
+// Details (description + seniority/employment/function/industry) are fetched
+// on demand — one job at a time — to stay under LinkedIn's guest rate limit.
+const _detailLoaded = {};   // jobId -> true once fetched
+
+async function ensureDetail(job, signal) {
+  if (!job || !job.jobId) return false;
+  if (job.description) return false;   // this job object already has its description (favorite / prior fetch)
+  if (!serverOnline) return false;
+  try {
+    const res = await fetch(`http://localhost:5000/job/${job.jobId}`, signal ? { signal } : undefined);
+    if (res.ok) {
+      const d = await res.json();
+      if (d.job_description)     job.description = d.job_description;
+      if (d.seniority_level)     job.seniority   = d.seniority_level;
+      if (d.job_function)        job.jobFunction = d.job_function;
+      if (d.job_industries)      job.industries  = d.job_industries;
+      if (d.job_employment_type) job.empType     = d.job_employment_type;
+      if (d.job_apply_link)      job.url         = d.job_apply_link;
+      _detailLoaded[job.jobId] = true;
+      job.score = calcScore(job);
+      // Apply any cached AI so the job shows fully right away. If it's from an older
+      // prompt version (d.ai_stale), still display it but DON'T mark it cached — leave it
+      // for the batch to silently re-run and upgrade. Fresh AI is cached so Gemini is skipped.
+      if (d.ai && Object.keys(d.ai).length) {
+        _applyBatchResult(job, d.ai);
+        if (d.ai_stale) {
+          job._aiStale = true;
+        } else {
+          job._aiStale = false;
+          _aiByJobId[job.jobId] = d.ai;
+        }
+      }
+      return !!d.throttled;          // tell the wave enricher whether LinkedIn throttled this
+    }
+  } catch (e) { /* aborted or failed — card still shows basic info */ }
+  return false;
+}
+
+// Auto-enrich the WHOLE list in waves: fire ENRICH_BATCH detail fetches at once,
+// then pause an ADAPTIVE gap. The server flags when it had to retry (429); a throttled
+// wave widens the gap, a clean wave tightens it — so it self-tunes to LinkedIn's
+// rate-limit bucket instead of a fixed guess.
+const ENRICH_BATCH     = 3;     // detail fetches per wave (smaller = gentler on a tight bucket)
+const ENRICH_GAP_START = 1500;  // starting gap between waves (ms)
+const ENRICH_GAP_MIN   = 1500;  // fastest cadence
+const ENRICH_GAP_MAX   = 8000;  // slowest back-off
+const AI_CHUNK         = 8;     // analyse jobs in batches of ~this many as they enrich → smaller
+                                // batches mean AI summaries/scores appear on the cards SOONER
+                                // (a touch more Gemini calls, still well within the free tier)
+
+let _enrichGen   = 0;           // bumped whenever a run is superseded/cancelled
+let _enrichAbort = null;        // AbortController for the active run's in-flight fetches
+let _enrichActive = false;      // true while a wave run is enriching/analysing (drives "Analyzing…")
+
+function _cancelEnrichment() {
+  _enrichGen++;
+  _enrichActive = false;
+  if (_enrichAbort) { try { _enrichAbort.abort(); } catch (e) {} _enrichAbort = null; }
+}
+
+// Fill in EVERY already-cached job in one request (pure DB reads, no rate limit) so the
+// whole list — including jobs you haven't scrolled to — shows full detail + AI instantly.
+// Returns the set of jobIds that were loaded (so the paced wave skips them).
+async function _bulkLoadCached(jobs) {
+  const loaded = new Set();
+  if (!serverOnline) return loaded;
+  const ids = jobs.filter(j => j.jobId && !j.description).map(j => j.jobId);
+  if (!ids.length) return loaded;
+  try {
+    const res = await fetch('http://localhost:5000/jobs/bulk', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+    if (!res.ok) return loaded;
+    const map = (await res.json()).jobs || {};
+    for (const j of jobs) {
+      const d = j.jobId && map[j.jobId];
+      if (!d) continue;
+      if (d.job_description)     j.description = d.job_description;
+      if (d.seniority_level)     j.seniority   = d.seniority_level;
+      if (d.job_function)        j.jobFunction = d.job_function;
+      if (d.job_industries)      j.industries  = d.job_industries;
+      if (d.job_employment_type) j.empType     = d.job_employment_type;
+      _detailLoaded[j.jobId] = true;
+      j.score = calcScore(j);
+      if (d.ai && Object.keys(d.ai).length) {
+        _applyBatchResult(j, d.ai);
+        if (d.ai_stale) { j._aiStale = true; }
+        else { j._aiStale = false; _aiByJobId[j.jobId] = d.ai; }
+      }
+      loaded.add(j.jobId);
+    }
+    if (viewMode === 'search') {
+      const p = document.getElementById('jobsPanel'); const sc = p ? p.scrollTop : 0;
+      renderCards(); if (p) p.scrollTop = sc;
+    }
+  } catch (e) { /* fall back to the paced wave */ }
+  return loaded;
+}
+
+async function _enrichAllInWaves() {
+  if (!serverOnline) return;
+  const gen = ++_enrichGen;               // claim this run
+  _enrichActive = true;                   // cards with a description now show "Analyzing…"
+  _enrichAbort = new AbortController();
+  const signal = _enrichAbort.signal;
+  let gap = ENRICH_GAP_START;
+  const jobs  = filteredJobs.slice();     // snapshot order (newest-first)
+  const panel = document.getElementById('jobsPanel');
+
+  _applyCachedAi();                        // instant AI for jobs analysed in a previous search (no request)
+
+  // Instantly fill in every already-cached job (one DB-backed request, no pacing). Only the
+  // un-cached/new jobs fall through to the paced wave below.
+  const loadedIds = await _bulkLoadCached(jobs);
+  if (gen !== _enrichGen) return;
+  const bulkLoaded = jobs.filter(j => j.jobId && loadedIds.has(j.jobId));
+  for (let k = 0; k < bulkLoaded.length; k += AI_CHUNK) _analyseBatch(bulkLoaded.slice(k, k + AI_CHUNK));
+
+  let aiBuf = [];                          // accumulate enriched jobs; analyse in batches of AI_CHUNK
+
+  for (let i = 0; i < jobs.length; i += ENRICH_BATCH) {
+    if (gen !== _enrichGen) return;        // a newer search/run superseded us
+    const wave = jobs.slice(i, i + ENRICH_BATCH)
+                     .filter(j => j.jobId && !_detailLoaded[j.jobId]);
+    if (wave.length) {
+      const flags = await Promise.all(wave.map(j => ensureDetail(j, signal)));
+      if (gen !== _enrichGen) return;      // re-check after the await
+      const throttled = flags.some(Boolean);
+      gap = throttled ? Math.min(Math.round(gap * 1.7), ENRICH_GAP_MAX)   // back off
+                      : Math.max(Math.round(gap * 0.8), ENRICH_GAP_MIN);  // speed up
+      const sc = panel ? panel.scrollTop : 0;
+      renderCards();                       // progressive: show newly-loaded fields/descriptions
+      if (panel) panel.scrollTop = sc;     // keep the user's scroll position
+      if (selectedJob != null) {
+        const card = document.getElementById('card-' + selectedJob);
+        if (card) card.classList.add('selected');
+      }
+      // Analyse in bounded chunks as jobs enrich; each call runs in parallel with the
+      // next chunk's fetches (fire-and-forget), so enrichment never pauses for Gemini.
+      aiBuf.push(...wave);
+      if (aiBuf.length >= AI_CHUNK) _analyseBatch(aiBuf.splice(0));
+    }
+    if (i + ENRICH_BATCH < jobs.length) await new Promise(r => setTimeout(r, gap));
+  }
+  if (gen === _enrichGen && aiBuf.length) _analyseBatch(aiBuf.splice(0));   // the rest, in one call
+  if (gen === _enrichGen) {
+    _enrichActive = false;                 // done: any still-blank cards revert to the Summarise button
+    if (viewMode === 'search') {
+      const sc = panel ? panel.scrollTop : 0;
+      renderCards();                       // jobs still in an in-flight batch keep "Analyzing…" via _aiInFlight
+      if (panel) panel.scrollTop = sc;
+    }
+  }
+}
+
+// ─── Select Job ───────────────────────────────────────────
+async function selectJob(id) {
+  selectedJob = id;
+  document.querySelectorAll('.job-card').forEach(c => c.classList.remove('selected'));
+  const card = document.getElementById('card-' + id);
+  if (card) {
+    card.classList.add('selected');
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  const job = filteredJobs.find(j => j.id === id);
+  if (!job) return;
+
+  showDetail(job);                 // basic info immediately
+  await ensureDetail(job);         // fetch description + the 4 fields
+  if (selectedJob !== id) return;  // user moved on while we were fetching
+  showDetail(job);                 // re-render panel with full data
+  // Only spend a request if this job isn't already summarised, cached, or queued by the batch.
+  const covered = job.aiDo || (job.jobId && (_aiByJobId[job.jobId] || _aiInFlight[job.jobId]));
+  if (job.description && !covered) loadAnalysis(job);
+}
+
+function showDetail(job) {
+  const panel = document.getElementById('companyPanel');
+  // Always recalculate fresh — guarantees breakdown matches badge
+  job.score = calcScore(job);
+  _updateCardBadge(job);
+  const sc = job.score;
+
+  // Pre-compute summary card values (used inside panel.innerHTML template)
+  const _cur = job.salaryMin > 0 ? (job.salaryCurrency || 'EUR') : (job.estSalaryCurrency || 'EUR');
+  const _sym = _cur === 'GBP' ? '£' : _cur === 'EUR' ? '€' : _cur === 'USD' ? '$' : _cur + ' ';
+  let salVal, salNote;
+  if (job.salaryMin > 0) {
+    salVal  = _sym + Math.round(job.salaryMin/1000) + 'k–' + Math.round(job.salaryMax/1000) + 'k';
+    salNote = 'Disclosed';
+  } else if (job.estSalaryMin > 0) {
+    salVal  = '~' + _sym + Math.round(job.estSalaryMin/1000) + 'k–' + Math.round(job.estSalaryMax/1000) + 'k';
+    salNote = 'AI estimate (' + (job.estSalaryConfidence || 'low') + ')';
+  } else {
+    salVal  = 'Not disclosed';
+    salNote = 'No data available';
+  }
+  const wtLabel      = job.workType === 'remote' ? 'Full Remote' : job.workType === 'hybrid' ? 'Hybrid' : 'On-site';
+  const wtNote       = job.workType === 'remote' ? 'Work from anywhere' : job.workType === 'hybrid' ? 'Mix of office & home' : 'Office required';
+  const _perks       = (job.aiPerks && job.aiPerks.length) ? job.aiPerks : (sc.matchedPerks || []);
+  const benefitsVal  = _perks.length ? `${_perks.length} found` : 'None detected';
+  const benefitsNote = _perks.length ? esc(_perks.slice(0, 2).join(', ')) + (_perks.length > 2 ? '…' : '') : 'none in description';
+
+  panel.innerHTML = `
+    <!-- Company header -->
+    <div class="company-header">
+      <div class="company-logo-box">
+        ${job.companyLogo
+          ? `<img src="${encodeURI(job.companyLogo)}" alt="" onerror="this.parentElement.textContent='🏢'">`
+          : '🏢'}
+      </div>
+      <div style="min-width:0;flex:1">
+        <div style="font-weight:700;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(job.company)}</div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(job.title)}</div>
+        ${job.companyWebsite ? `<a href="${encodeURI(job.companyWebsite)}" target="_blank" style="font-size:0.73rem;color:var(--accent);text-decoration:none;margin-top:3px;display:block">LinkedIn page →</a>` : ''}
+      </div>
+    </div>
+
+
+    <!-- 3 topic columns: score + detail merged (Salary · Remote · Benefits) -->
+    <div class="sum-grid">
+      <div class="sum-card">
+        <div class="sum-icon">💰</div>
+        <div class="sum-title">Salary · ${sc.salary}/50</div>
+        <div class="sum-val">${salVal}</div>
+        <div class="sum-note">${salNote}</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-icon">🏠</div>
+        <div class="sum-title">Remote · ${sc.workType}/25</div>
+        <div class="sum-val">${wtLabel}</div>
+        <div class="sum-note">${wtNote}</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-icon">🎁</div>
+        <div class="sum-title">Benefits · ${sc.benefits}/25</div>
+        <div class="sum-val">${benefitsVal}</div>
+        <div class="sum-note">${benefitsNote}</div>
+      </div>
+    </div>
+
+    <!-- LinkedIn details — compact inline rows -->
+    ${(job.seniority || job.empType || job.jobFunction || job.industries) ? `
+    <div class="ld-compact">
+      ${job.empType     ? `<div><span>Employment</span><b>${esc(job.empType)}</b></div>` : ''}
+      ${job.seniority   ? `<div><span>Seniority</span><b>${esc(job.seniority)}</b></div>` : ''}
+      ${job.jobFunction ? `<div><span>Function</span><b>${esc(job.jobFunction)}</b></div>` : ''}
+      ${job.industries  ? `<div><span>Industry</span><b>${esc(job.industries)}</b></div>` : ''}
+    </div>` : ''}
+
+    <!-- AI Insights panel — filled by renderAiInsights() after analysis runs -->
+    <div id="ai-insights-panel">
+      ${(job.aiSkills?.length || job.aiCulture) ? '' : `<div class="insights-placeholder" style="margin:10px 0;font-size:0.76rem;color:var(--muted)">${aiConfigured ? '✨ Click Summarise on the card for AI insights' : '✨ Add a Gemini key in ⚙️ Settings to enable AI insights'}</div>`}
+    </div>
+
+    <!-- Job description (collapsible) -->
+    ${job.description ? `
+    <details class="jd-block">
+      <summary>📄 Job description</summary>
+      <div class="jd-text">${formatJD(job.description)}</div>
+    </details>` : ''}
+
+    <!-- Glassdoor search -->
+    <a class="glassdoor-btn" href="https://www.glassdoor.com/Search/results.htm?keyword=${encodeURIComponent(job.company)}" target="_blank">
+      <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="9" fill="#fff"/><path d="M4 7h10M4 7v5a1 1 0 001 1h8a1 1 0 001-1V7M4 7l1-3h8l1 3" stroke="#0caa41" stroke-width="1.4" stroke-linecap="round"/></svg>
+      Search "${esc(job.company)}" on Glassdoor
+    </a>
+
+    <!-- Apply -->
+    <a class="apply-btn" href="https://www.linkedin.com/jobs/view/${job.jobId || ''}/" target="_blank">Apply on LinkedIn →</a>
+    ${job.url && !job.url.includes('linkedin.com/jobs') ? `<a class="apply-btn" href="${job.url}" target="_blank" style="margin-top:6px;background:var(--surface2);color:var(--text)">External Apply Page ↗</a>` : ''}
+  `;
+
+  // If AI data already cached for this job, render it immediately
+  if (job.aiSkills?.length || job.aiCulture) renderAiInsights(job);
+}
+
+function closeDetail() {
+  document.getElementById('companyPanel').innerHTML = `
+    <div class="company-empty">
+      <div class="icon">👆</div>
+      <p>Select a job to see company insights</p>
+    </div>`;
+  document.querySelectorAll('.job-card').forEach(c => c.classList.remove('selected'));
+}
+
+// ─── PDF export (browser print-to-PDF — no dependencies) ───
+function _expMoney(job) {
+  const cur = job.salaryMin > 0 ? (job.salaryCurrency || 'EUR') : (job.estSalaryCurrency || 'EUR');
+  const sym = cur === 'GBP' ? '£' : cur === 'EUR' ? '€' : cur === 'USD' ? '$' : cur + ' ';
+  if (job.salaryMin > 0)
+    return `${sym}${Math.round(job.salaryMin/1000)}k–${sym}${Math.round(job.salaryMax/1000)}k (disclosed)`;
+  if (job.estSalaryMin > 0)
+    return `~${sym}${Math.round(job.estSalaryMin/1000)}k–${sym}${Math.round(job.estSalaryMax/1000)}k (AI estimate, ${job.estSalaryConfidence || 'low'})`;
+  return 'Not disclosed';
+}
+
+// Build a self-contained printable dossier for one job.
+function _expCard(job) {
+  const sc = job.score = calcScore(job);
+  const wt = job.workType === 'remote' ? 'Full Remote' : job.workType === 'hybrid' ? 'Hybrid' : 'On-site';
+  const sCls = sc.total >= 70 ? 'hi' : sc.total >= 45 ? 'mid' : 'lo';
+  const chip = (label, val) => val ? `<span class="chip"><b>${esc(label)}:</b> ${esc(val)}</span>` : '';
+  const inline = arr => (arr || []).map(esc).join(' · ');
+  const row = (label, arr, cls) => (arr && arr.length)
+    ? `<div class="row ${cls || ''}"><b>${label}</b> ${inline(arr)}</div>` : '';
+  const summary = (job.aiDo || job.aiNeed || job.aiFlag) ? `<div class="sec">
+      <div class="row"><b>🎯 Role:</b> ${esc(job.aiDo || '—')}</div>
+      <div class="row"><b>✅ Need:</b> ${esc(job.aiNeed || '—')}</div>
+      <div class="row"><b>⚡ Watch:</b> ${esc(job.aiFlag || '—')}</div></div>` : '';
+  const hasSkills = (job.aiSkillsTech || []).length || (job.aiSkillsProc || []).length || (job.aiSkillsSoft || []).length;
+  const skills = hasSkills ? `<div class="sec">
+      ${row('Technical:', job.aiSkillsTech)}${row('Process:', job.aiSkillsProc)}${row('Soft:', job.aiSkillsSoft)}</div>` : '';
+  const hasFlags = (job.aiPerks || []).length || (job.aiRedFlags || []).length || (job.aiGreenFlags || []).length;
+  const flags = hasFlags ? `<div class="sec">
+      ${row('🎁 Perks:', job.aiPerks)}${row('🚩 Red flags:', job.aiRedFlags, 'red')}${row('✅ Green flags:', job.aiGreenFlags, 'green')}</div>` : '';
+  const gd = `https://www.glassdoor.com/Search/results.htm?keyword=${encodeURIComponent(job.company || '')}`;
+  const ds = esc(((job.title || '') + ' ' + (job.company || '') + ' ' + (job.location || '')).toLowerCase());
+  return `<div class="card" data-s="${ds}">
+    <div class="chead">
+      <div><div class="ctitle">${esc(job.title)}</div><div class="cco">${esc(job.company)}${job.location ? ' · ' + esc(job.location) : ''}</div></div>
+      <div class="score s-${sCls}">${sc.total}<small>/100</small></div>
+    </div>
+    <div class="chips">
+      ${chip('Work', wt)}${chip('Salary', _expMoney(job))}${chip('Employment', job.empType)}${chip('Seniority', job.seniority)}${chip('Function', job.jobFunction)}${chip('Industry', job.industries)}
+    </div>
+    <div class="bd">Salary ${sc.salary}/50 · Remote ${sc.workType}/25 · Benefits ${sc.benefits}/25</div>
+    ${summary}${skills}${flags}
+    ${job.description ? `<details class="jd"><summary>Job description</summary><div class="jdbody">${formatJD(job.description)}</div></details>` : ''}
+    <div class="links">
+      <a class="btn li" href="https://www.linkedin.com/jobs/view/${job.jobId || ''}/" target="_blank" rel="noopener">Apply on LinkedIn →</a>
+      <a class="btn gd" href="${gd}" target="_blank" rel="noopener">Search "${esc(job.company)}" on Glassdoor ↗</a>
+    </div>
+  </div>`;
+}
+
+const _EXPORT_CSS = `
+  *{box-sizing:border-box}
+  body{font:14px/1.55 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1e2227;background:#eef1f4;margin:0;padding:24px}
+  .wrap{max-width:840px;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .brand{font-weight:700;font-size:15px;color:#0a66c2}
+  .stamp{font-size:12px;color:#8a929b}
+  .flt{width:100%;padding:10px 12px;border:1px solid #d4dae0;border-radius:8px;font-size:13px;margin-bottom:14px;background:#fff}
+  .card{background:#fff;border:1px solid #e3e8ed;border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(20,30,50,.05)}
+  .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+  .ctitle{font-size:18px;font-weight:700;line-height:1.25}
+  .cco{font-size:13px;color:#5b636c;margin-top:2px}
+  .score{flex-shrink:0;font-weight:700;font-size:17px;color:#fff;border-radius:10px;padding:8px 12px;text-align:center;min-width:56px}
+  .score small{display:block;font-size:9px;font-weight:600;opacity:.85}
+  .s-hi{background:#1f9d55}.s-mid{background:#d69e2e}.s-lo{background:#c0392b}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+  .chip{font-size:11.5px;background:#f1f4f7;border:1px solid #e3e8ed;border-radius:6px;padding:3px 9px;color:#3a424b}
+  .chip b{color:#1e2227}
+  .bd{font-size:11.5px;color:#8a929b;margin-bottom:10px}
+  .sec{margin:10px 0}
+  .row{margin:3px 0;font-size:13px}
+  .row b{color:#1e2227}
+  .red{color:#c0392b}.green{color:#1f9d55}
+  details.jd{margin:10px 0 4px;border-top:1px solid #eef1f4;padding-top:8px}
+  details.jd summary{cursor:pointer;font-weight:600;font-size:13px;color:#0a66c2;list-style:none}
+  details.jd summary::-webkit-details-marker{display:none}
+  details.jd summary:before{content:'▸ ';font-size:11px}
+  details.jd[open] summary:before{content:'▾ '}
+  .jdbody{margin-top:8px;font-size:12.5px;color:#2c333b}
+  .jdbody .jd-h{font-weight:700;margin:10px 0 3px}
+  .jdbody .jd-p{margin:0 0 7px}
+  .jdbody .jd-ul{margin:4px 0 9px;padding-left:20px}
+  .jdbody .jd-ul li{margin-bottom:2px}
+  .links{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+  .btn{display:inline-block;font-size:12.5px;font-weight:600;text-decoration:none;padding:9px 16px;border-radius:8px;color:#fff}
+  .btn.li{background:#0a66c2}.btn.gd{background:#0caa41}
+  .btn:hover{opacity:.92}
+  @media print{body{background:#fff;padding:0}.flt{display:none}.card{box-shadow:none;break-inside:avoid;page-break-inside:avoid}details.jd>.jdbody{display:block!important}}
+`;
+
+// Build a complete, self-contained HTML document and trigger a download.
+function _exportDoc(fileName, docTitle, inner, withFilter) {
+  const stamp = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const filterBar = withFilter
+    ? '<input class="flt" placeholder="🔍 Filter by title, company or location…" oninput="_flt(this.value)">' : '';
+  const js = withFilter
+    ? "function _flt(v){v=v.toLowerCase();var n=document.querySelectorAll('.card');for(var i=0;i<n.length;i++){n[i].style.display=(n[i].getAttribute('data-s')||'').indexOf(v)>-1?'':'none';}}"
+    : '';
+  const doc = '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(docTitle) + '</title>'
+    + '<style>' + _EXPORT_CSS + '</style></head><body><div class="wrap">'
+    + '<div class="topbar"><div class="brand">📋 Job Analyser</div><div class="stamp">Exported ' + esc(stamp) + '</div></div>'
+    + filterBar + inner + '</div>'
+    + (js ? ('<scr' + 'ipt>' + js + '</scr' + 'ipt>') : '')
+    + '</body></html>';
+  const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+const _expFileName = s => (s || 'job').replace(/[^\w]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60);
+
+async function exportJobHtml(event, id) {
+  if (event) event.stopPropagation();
+  const list = viewMode === 'favorites' ? favJobs : (viewMode === 'history' ? libJobs : filteredJobs);
+  const job = list.find(j => j.id == id);
+  if (!job) { showError('Could not find that job to export.'); return; }
+  try { await ensureDetail(job); } catch (e) {}   // make sure the description is loaded
+  const fn = _expFileName(`${job.company}_${job.title}`) + '.html';
+  _exportDoc(fn, `${job.title} — ${job.company}`, _expCard(job), false);
+}
+
+async function exportFavoritesHtml() {
+  if (!favJobs || !favJobs.length) { showError('No favorites to export yet.'); return; }
+  const btn = document.getElementById('favExportBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+  for (const j of favJobs) { if (!j.description) { try { await ensureDetail(j); } catch (e) {} } }
+  const inner = favJobs.map(_expCard).join('');
+  _exportDoc(`favorites_${favJobs.length}_jobs.html`, `Favorites (${favJobs.length})`, inner, true);
+  if (btn) { btn.disabled = false; btn.textContent = '⬇ Export all favorites'; }
+}
+
+// ─── Card badge updater ───────────────────────────────────
+function _updateCardBadge(job) {
+  const card = document.getElementById('card-' + job.id);
+  if (!card) return;
+  const num   = card.querySelector('.score-num');
+  const badge = card.querySelector('.score-badge');
+  if (num)   num.textContent = job.score.total;
+  if (badge) badge.className = 'score-badge ' + (job.score.total >= 70 ? 'score-high' : job.score.total >= 45 ? 'score-mid' : 'score-low');
+}
+
+// ─── Auto batch analysis ──────────────────────────────────
+const _aiByJobId  = {};   // stable LinkedIn jobId -> AI result; reused across searches
+const _aiInFlight = {};   // jobId -> true while its batch analysis is in flight (dedup)
+
+// Apply one AI result onto a job (summary card, insights, salary estimate, score).
+function _applyBatchResult(job, r) {
+  if (!job || !r || !Object.keys(r).length) return;
+  // Requirements (technical / soft) and grouped skills
+  job.aiReq        = r.requirements || { technical: { must: [], nice: [] }, soft: { must: [], nice: [] } };
+  const _sk        = r.skills || {};
+  job.aiSkillsTech = _sk.technical || [];
+  job.aiSkillsProc = _sk.process   || [];
+  job.aiSkillsSoft = _sk.soft      || [];
+  job.aiSkills     = [...job.aiSkillsTech, ...job.aiSkillsProc, ...job.aiSkillsSoft];  // flat, for "has AI" checks
+  job.aiPerks      = Array.isArray(r.perks) ? r.perks : [];
+  job.aiSeniority  = r.seniority    || null;
+  job.aiRedFlags   = r.red_flags    || [];
+  job.aiGreenFlags = r.green_flags  || [];
+  job.aiCulture    = r.culture      || null;
+  job.aiDo         = r.do   || job.aiDo   || null;   // stored so renderCards can reproduce
+  job.aiNeed       = r.need || job.aiNeed || null;
+  job.aiFlag       = r.flag || job.aiFlag || null;
+  // AI-determined work arrangement overrides the card-only guess
+  if (r.work_arrangement) { job.workType = r.work_arrangement; job.workTypeInferred = false; }
+
+  if (r.do || r.need || r.flag) {
+    const summaryHtml = `
+      <div class="ai-badge">✨ AI Summary</div>
+      <div class="ai-bullet"><span class="ai-icon">🎯</span><span>${esc(r.do)   || '—'}</span></div>
+      <div class="ai-bullet"><span class="ai-icon">✅</span><span>${esc(r.need) || '—'}</span></div>
+      <div class="ai-bullet"><span class="ai-icon" style="color:var(--warn)">⚡</span><span style="color:var(--warn)">${esc(r.flag) || '—'}</span></div>`;
+    _analysisCache[job.id] = { summaryHtml, salaryHtml: null };
+    _applyAnalysis(job, { summaryHtml, salaryHtml: null });
+  }
+
+  if (job.salaryMin === 0) {
+    job.estSalaryMin        = r.estimated_salary_min  || 0;
+    job.estSalaryMax        = r.estimated_salary_max  || 0;
+    job.estSalaryCurrency   = r.salary_currency       || 'EUR';
+    job.estSalaryConfidence = r.salary_confidence     || 'low';
+
+    const salEl = document.getElementById('sal-' + job.id);
+    if (salEl) {
+      if (job.estSalaryMin > 0) {
+        const cur = job.estSalaryCurrency || 'EUR';
+        const sym = cur === 'GBP' ? '£' : cur === 'EUR' ? '€' : cur === 'USD' ? '$' : cur + ' ';
+        const fmt = n => `${sym}${Math.round(n / 1000)}k`;
+        const note = job.estSalaryConfidence === 'low' ? 'est?' : 'est.';
+        salEl.className = 'salary-chip estimated';
+        salEl.innerHTML = `<span title="AI salary estimate (${job.estSalaryConfidence} confidence)">~${fmt(job.estSalaryMin)}–${fmt(job.estSalaryMax)}</span><span style="font-size:0.7rem;opacity:0.65">${note}</span>`;
+      } else {
+        // No usable estimate — never leave the chip stuck on "Estimating…"
+        salEl.className = 'salary-chip unknown';
+        salEl.innerHTML = `Salary not listed<button class="sal-est-btn" onclick="estimateSalary(event,${job.id})">💰 Estimate</button>`;
+      }
+    }
+  }
+
+  job.score = calcScore(job);
+  _updateCardBadge(job);
+  if (selectedJob === job.id) showDetail(job);
+  if (viewMode === 'history') _histApply();   // refresh the library row's score after analysis
+}
+
+// Analyse a specific set of jobs (those with a loaded description, not already
+// cached or in-flight). Safe to call per-wave and concurrently.
+async function _analyseBatch(jobs) {
+  if (!serverOnline) return;
+  const pending = jobs.filter(j =>
+    j.description && (!j.aiDo || j._aiStale) && !(j.jobId && _aiByJobId[j.jobId]) && !(j.jobId && _aiInFlight[j.jobId]));
+  if (!pending.length) return;
+  pending.forEach(j => { if (j.jobId) _aiInFlight[j.jobId] = true; });
+
+  const payload = pending.map((j, i) => ({
+    i,
+    job_id:      j.jobId,
+    title:       j.title,
+    company:     j.company,
+    location:    j.location,
+    work_type:   j.workType,
+    description: (j.description || '').slice(0, 4500),   // reach the benefits/perks section, usually at the END of the JD
+  }));
+
+  try {
+    const res = await fetch('http://localhost:5000/analyse-batch', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ jobs: payload }),
+    });
+    if (!res.ok) return;
+    const data    = await res.json();
+    const results = data.results || [];
+    results.forEach((r, pos) => {
+      if (!r || !Object.keys(r).length) return;
+      // Map by the echoed index when present (robust against reordering); else by position.
+      const idx = Number.isInteger(r.i) ? r.i : pos;
+      const job = pending[idx];
+      if (!job) return;
+      if (job.jobId) _aiByJobId[job.jobId] = r;
+      job._aiStale = false;                 // fresh result — no longer stale
+      _applyBatchResult(job, r);
+    });
+    // Re-render so the cards reflect the AI work-type + perks (idempotent, scroll preserved).
+    if (viewMode === 'search') {
+      const panel = document.getElementById('jobsPanel');
+      const sc = panel ? panel.scrollTop : 0;
+      applyFilters();
+      if (panel) panel.scrollTop = sc;
+    }
+  } catch (e) { /* silent fail */ }
+  finally { pending.forEach(j => { if (j.jobId) delete _aiInFlight[j.jobId]; }); }
+}
+
+// Apply AI results we already have cached (e.g. a repeat search) — no Gemini request.
+function _applyCachedAi() {
+  for (const j of allJobs) {
+    if (j.jobId && _aiByJobId[j.jobId] && !j.aiDo) _applyBatchResult(j, _aiByJobId[j.jobId]);
+  }
+}
+
+// ─── Combined AI Analysis (summary + salary in one call) ──
+const _analysisCache = {};  // jobId → {summaryHtml, salaryHtml} — shared by both buttons
+const _analysisPending = {}; // jobId → Promise — dedup concurrent clicks
+
+// Single-job analysis (the card's Summarise/Estimate buttons) now goes through the
+// same batch path + schema as the auto-enricher, so there's one prompt to maintain.
+async function loadAnalysis(job) {
+  if (job.aiDo) { if (selectedJob === job.id) renderAiInsights(job); return; }   // already done
+  await _analyseBatch([job]);
+  if (!job.aiDo) _applyError(job, 'no_key');   // nothing came back → likely missing/invalid key
+}
+
+function _applyAnalysis(job, { summaryHtml, salaryHtml }) {
+  // Recalculate score only when a salary estimate was just added (chip and score stay in sync)
+  if (job.salaryMin === 0 && job.estSalaryMin > 0) {
+    job.score = calcScore(job);
+    _updateCardBadge(job);
+  }
+  const aiEl  = document.getElementById('ai-'  + job.id);
+  const salEl = document.getElementById('sal-' + job.id);
+  if (aiEl)  { aiEl.innerHTML = summaryHtml; aiEl.classList.remove('ai-loading'); }
+  if (salEl && salaryHtml && job.salaryMin === 0) {
+    salEl.className = 'salary-chip estimated';
+    salEl.innerHTML = salaryHtml;
+  }
+  // If this job's detail panel is open, refresh the AI insights section
+  if (selectedJob === job.id) renderAiInsights(job);
+}
+
+function renderAiInsights(job) {
+  const el = document.getElementById('ai-insights-panel');
+  if (!el) return;
+
+  const req   = job.aiReq || { technical: { must: [], nice: [] }, soft: { must: [], nice: [] } };
+  const perks = job.aiPerks || [];
+  const hasAny = (job.aiSkills?.length || perks.length ||
+    req.technical.must.length || req.technical.nice.length ||
+    req.soft.must.length || req.soft.nice.length ||
+    job.aiRedFlags?.length || job.aiGreenFlags?.length || job.aiCulture || job.aiSeniority);
+  if (!hasAny) { el.innerHTML = ''; return; }
+
+  const list  = (arr, icon, cls) => (arr && arr.length)
+    ? arr.map(f => `<div class="flag-item ${cls || ''}"><span>${icon}</span><span>${esc(f)}</span></div>`).join('')
+    : '<div class="flag-item" style="color:var(--muted);font-style:italic">—</div>';
+  const pills = arr => (arr && arr.length) ? arr.map(s => `<span class="skill-pill">${esc(s)}</span>`).join('') : '';
+  const cultureMap   = { startup:'🚀 Startup', 'scale-up':'📈 Scale-up', corporate:'🏢 Corporate', enterprise:'🏛 Enterprise' };
+  const seniorityMap = { junior:'Junior', mid:'Mid-level', senior:'Senior', lead:'Lead', executive:'Executive' };
+
+  let html = `<div class="ai-insights">`;
+
+  // Perks & benefits
+  if (perks.length) html += `
+    <div class="insights-section">
+      <div class="insights-label">🎁 Perks &amp; Benefits</div>
+      <div class="flag-list">${perks.map(p => `<div class="flag-item green"><span>✓</span><span>${esc(p)}</span></div>`).join('')}</div>
+    </div>`;
+
+  // Skills & Requirements — merged per category (Technical · Process · Soft),
+  // flat (no must/nice), deduped, side by side. One pill per skill, shown once.
+  const uniq = arr => {
+    const seen = new Set(), out = [];
+    for (const x of (arr || [])) {
+      const k = (x || '').trim().toLowerCase();
+      if (x && !seen.has(k)) { seen.add(k); out.push(x); }
+    }
+    return out;
+  };
+  const tech = uniq([...(job.aiSkillsTech || []), ...req.technical.must, ...req.technical.nice]);
+  const proc = uniq([...(job.aiSkillsProc || [])]);
+  const soft = uniq([...(job.aiSkillsSoft || []), ...req.soft.must, ...req.soft.nice]);
+  const skCol = (lbl, arr) => arr.length
+    ? `<div class="skills-col"><div class="skills-col-lbl">${lbl}</div><div class="skill-pills">${pills(arr)}</div></div>` : '';
+  if (tech.length || proc.length || soft.length) html += `
+    <div class="insights-section">
+      <div class="insights-label">🧰 Skills &amp; Requirements</div>
+      <div class="skills-cols">${skCol('Hard skills', tech)}${skCol('Process', proc)}${skCol('Soft', soft)}</div>
+    </div>`;
+
+  // Signals
+  if ((job.aiGreenFlags || []).length || (job.aiRedFlags || []).length) html += `
+    <div class="insights-section">
+      <div class="insights-label">⚖️ Signals</div>
+      <div class="signals-grid">
+        <div><div class="signals-col-label green">✅ Green flags</div><div class="flag-list">${list(job.aiGreenFlags,'✅','green')}</div></div>
+        <div><div class="signals-col-label red">🚩 Red flags</div><div class="flag-list">${list(job.aiRedFlags,'🚩','red')}</div></div>
+      </div>
+    </div>`;
+
+  if (job.aiCulture || job.aiSeniority) html += `
+    <div class="insights-section">
+      <div class="insights-label">🔍 Role Read</div>
+      <div class="culture-row">
+        ${job.aiCulture    ? `<span class="culture-badge ${job.aiCulture}">${cultureMap[job.aiCulture] || job.aiCulture}</span>` : ''}
+        ${job.aiSeniority  ? `<span class="seniority-read">${seniorityMap[job.aiSeniority] || job.aiSeniority} level</span>` : ''}
+      </div>
+    </div>`;
+
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function _applyError(job, msg) {
+  const aiEl  = document.getElementById('ai-'  + job.id);
+  const salEl = document.getElementById('sal-' + job.id);
+  if (msg === 'no_key') {
+    if (aiEl)  { aiEl.innerHTML = `<div class="ai-badge">✨ AI Summary</div><div class="ai-bullet" style="color:var(--muted)"><span class="ai-icon">—</span><span style="font-style:italic">Add Gemini API key in ⚙️ Settings</span></div>`; aiEl.classList.remove('ai-loading'); }
+    if (salEl) { salEl.className = 'salary-chip unknown'; salEl.innerHTML = 'Add Gemini key'; }
+  } else if (msg === 'no_desc') {
+    if (aiEl)  { aiEl.innerHTML = `<div class="ai-badge">✨ AI Summary</div><div class="ai-bullet" style="color:var(--muted)"><span class="ai-icon">—</span><span style="font-style:italic">No description to summarise</span></div>`; aiEl.classList.remove('ai-loading'); }
+    if (salEl) { salEl.className = 'salary-chip unknown'; salEl.innerHTML = `Salary not listed<button class="sal-est-btn" onclick="estimateSalary(event,${job.id})">💰 Estimate</button>`; }
+  } else {
+    if (aiEl)  { aiEl.innerHTML = `<button class="ai-trigger-btn" onclick="triggerSummary(event,${job.id})">↺ Retry</button>`; aiEl.classList.remove('ai-loading'); }
+    if (salEl) { salEl.className = 'salary-chip unknown'; salEl.innerHTML = `Salary not listed<button class="sal-est-btn" onclick="estimateSalary(event,${job.id})">↺ Retry</button>`; }
+  }
+}
+
+// Button handlers — both call the same loadAnalysis
+async function estimateSalary(event, id) {
+  event.stopPropagation();
+  const list = viewMode === 'favorites' ? favJobs : (viewMode === 'history' ? libJobs : filteredJobs);
+  const job = list.find(j => j.id == id);
+  if (!job) return;
+  if (!aiConfigured) { showError('Resume AI in ⚙️ Settings first (it’s paused or no key).'); return; }
+  const el = document.getElementById('sal-' + id);
+  if (el) { el.className = 'salary-chip unknown'; el.innerHTML = '<span style="font-style:italic">Estimating…</span>'; }
+  await ensureDetail(job);   // make sure we have the description
+  try {
+    // Dedicated salary endpoint — forces a fresh estimate even if the job was already analysed.
+    const res = await fetch('http://localhost:5000/estimate-salary', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: job.title, company: job.company, location: job.location,
+                             work_type: job.workType, description: job.description || '' }),
+    });
+    if (!res.ok) throw 0;
+    const d = await res.json();
+    if (!(d.min > 0 && d.max > 0)) throw 0;
+    job.estSalaryMin = d.min; job.estSalaryMax = d.max;
+    job.estSalaryConfidence = d.confidence || 'medium';
+    job.estSalaryCurrency = job.estSalaryCurrency || 'EUR';
+    job.score = calcScore(job);
+    _updateCardBadge(job);
+    const s = _curSym(job.estSalaryCurrency || 'EUR');
+    const fmt = n => `${s}${Math.round(n / 1000)}k`;
+    const note = job.estSalaryConfidence === 'low' ? 'est?' : 'est.';
+    const cur = document.getElementById('sal-' + id);
+    if (cur) { cur.className = 'salary-chip estimated';
+      cur.innerHTML = `<span title="AI salary estimate (${job.estSalaryConfidence} confidence)">~${fmt(d.min)}–${fmt(d.max)}</span><span style="font-size:0.7rem;opacity:0.65">${note}</span>`; }
+    if (selectedJob === job.id) showDetail(job);   // refresh the panel salary card
+  } catch (e) {
+    const cur = document.getElementById('sal-' + id);
+    if (cur) { cur.className = 'salary-chip unknown';
+      cur.innerHTML = `Salary not listed<button class="sal-est-btn" onclick="estimateSalary(event,${id})">↺ Retry</button>`; }
+    showError('Couldn’t estimate a salary for this role — try again.');
+  }
+}
+
+// Keep loadSummary name so triggerSummary still works
+function loadSummary(job) { return loadAnalysis(job); }
+
+async function triggerSummary(event, id) {
+  event.stopPropagation();
+  const job = filteredJobs.find(j => j.id == id);
+  if (!job) return;
+  const el = document.getElementById('ai-' + id);
+  el.classList.add('ai-loading');
+  el.innerHTML = `<div class="ai-badge">✨ AI Summary</div><div class="ai-bullet" style="color:var(--muted)"><span class="ai-icon">⏳</span><span>Generating…</span></div>`;
+  await ensureDetail(job);   // lazy mode: pull the description first
+  loadSummary(job);
+}
+
+// ─── Card description toggle ──────────────────────────────
+async function toggleDesc(event, id) {
+  event.stopPropagation();
+  const el  = document.getElementById('desc-' + id);
+  const btn = document.getElementById('desc-toggle-' + id);
+  if (!el) return;
+  const open = el.style.display === 'block';
+  el.style.display = open ? 'none' : 'block';
+  const arrow = btn.querySelector('span:last-child');
+  if (arrow) arrow.textContent = open ? '▾' : '▴';
+  // Lazy-load the description on first expand.
+  if (!open && !el.textContent.trim()) {
+    const job = filteredJobs.find(j => j.id == id);
+    el.textContent = 'Loading…';
+    await ensureDetail(job);
+    el.textContent = job && job.description ? job.description : 'No description available.';
+  }
+}
+
+// ─── Loading / Error States ───────────────────────────────
+function showLoading(msg) {
+  document.getElementById('jobsPanel').innerHTML = `
+    <div class="state-box">
+      <div class="spinner"></div>
+      <p>${msg || 'Searching LinkedIn…'}</p>
+    </div>`;
+}
+
+function showError(msg) {
+  document.getElementById('jobsPanel').innerHTML = `
+    <div class="state-box">
+      <div class="icon">⚠️</div>
+      <p>${msg}</p>
+    </div>`;
+}
+
+// ─── Enter key support ────────────────────────────────────
+document.querySelectorAll('.search-row input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); }));
+
+</script>
+
+</body>
+</html>
