@@ -516,10 +516,69 @@
   .right-panel::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
   .jobs-panel, .right-panel { scrollbar-width: auto; scrollbar-color: var(--accent) var(--surface); }
 
-  @media (max-width: 700px) {
-    .main { flex-direction: column; height: auto; }
-    .jobs-panel { border-right: none; border-bottom: 1px solid var(--border); max-height: 60vh; }
-    .right-panel { min-height: 50vh; }
+  /* ── Mobile ── */
+  .mobile-back { display: none; }
+  @media (max-width: 760px) {
+    /* Header: title row + horizontally scrollable tabs */
+    header { flex-wrap: wrap; padding: 12px 14px; gap: 8px 10px; }
+    header h1 { font-size: 1.1rem; }
+    #serverStatus { gap: 8px !important; }
+    #statusText { display: none; }
+    .view-tabs { order: 3; width: 100%; margin-left: 0; overflow-x: auto; scrollbar-width: none;
+      -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+    .view-tabs::-webkit-scrollbar { display: none; }
+    .view-tab { flex: 0 0 auto; padding: 8px 14px; white-space: nowrap; }
+
+    /* Search: stacked full-width fields; 16px font stops iOS zoom-on-focus */
+    .search-section { padding: 14px; }
+    .search-row { gap: 8px; }
+    .search-row input, .search-row select { font-size: 16px; padding: 11px 12px; }
+    .search-row input[name=query], .search-row input[name=location] { flex: 1 1 100%; min-width: 0; }
+    .search-row select { flex: 1 1 100%; min-width: 0; }
+    .search-row .btn { flex: 1 1 0; padding: 12px 10px; }
+    .hist-filter, .sfield input { font-size: 16px; }
+    .filters-row { padding: 10px 14px; gap: 8px; }
+    .filter-chip { padding: 7px 12px; }
+    .public-banner { font-size: 0.78rem; padding: 8px 14px; }
+
+    /* Layout: list scrolls with the page; detail opens as a full-screen sheet */
+    .main { display: block; height: auto; min-height: 0; }
+    .jobs-panel { border-right: none; overflow: visible; padding: 14px; }
+    .right-panel {
+      display: none; position: fixed; inset: 0; z-index: 8000; background: var(--bg);
+      overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+      padding: 0 14px calc(20px + env(safe-area-inset-bottom));
+    }
+    body.detail-open { overflow: hidden; }
+    body.detail-open .right-panel { display: block; }
+    .mobile-back {
+      display: flex; align-items: center; gap: 6px; position: sticky; top: 0; z-index: 1;
+      margin: 0 -14px 14px; padding: 12px 14px; width: calc(100% + 28px);
+      background: var(--surface); border: none; border-bottom: 1px solid var(--border);
+      color: var(--accent); font-size: 0.95rem; font-weight: 600; cursor: pointer; text-align: left;
+    }
+
+    /* Cards & detail content */
+    .job-card { padding: 14px; }
+    .job-card:hover { transform: none; }
+    .stats-bar { gap: 14px; }
+    .sum-grid { gap: 6px; }
+    .sum-card { padding: 8px 6px; }
+    .detail-grid, .signals-grid { grid-template-columns: 1fr; }
+    .skills-cols { flex-direction: column; gap: 10px; }
+    .jd-text { max-height: none; }
+    .card-desc-content { max-height: none; }
+
+    /* Library rows: drop the date column, keep the essentials */
+    .hist-head .hist-filter { flex: 1 1 45%; }
+    .hist-row { gap: 8px; padding: 9px 8px; }
+    .hist-row .hist-meta:not([class*="hist-wt-"]) { display: none; }
+    .hist-title, .hist-sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; }
+    .hist-title-row { flex-wrap: wrap; }
+
+    .settings-modal { padding: 20px 16px; max-height: 92vh; overflow-y: auto; }
+    .load-btn { padding: 10px 16px; }
   }
   /* ── Public demo mode: hide owner-only controls ── */
   body.public-mode .btn-settings,
@@ -2037,6 +2096,7 @@ async function selectJob(id) {
   if (!job) return;
 
   showDetail(job);                 // basic info immediately
+  _openMobileDetail();             // phones: show the detail as a full-screen sheet
   await ensureDetail(job);         // fetch description + the 4 fields
   if (selectedJob !== id) return;  // user moved on while we were fetching
   showDetail(job);                 // re-render panel with full data
@@ -2073,6 +2133,7 @@ function showDetail(job) {
   const benefitsNote = _perks.length ? esc(_perks.slice(0, 2).join(', ')) + (_perks.length > 2 ? '…' : '') : 'none in description';
 
   panel.innerHTML = `
+    <button class="mobile-back" onclick="closeMobileDetail()">← Back to jobs</button>
     <!-- Company header -->
     <div class="company-header">
       <div class="company-logo-box">
@@ -2146,7 +2207,24 @@ function showDetail(job) {
   if (job.aiSkills?.length || job.aiCulture) renderAiInsights(job);
 }
 
+// ─── Mobile: detail panel as a full-screen sheet ───────────
+const _mobileQuery = window.matchMedia('(max-width: 760px)');
+function _openMobileDetail() {
+  if (!_mobileQuery.matches || document.body.classList.contains('detail-open')) return;
+  document.body.classList.add('detail-open');
+  document.getElementById('companyPanel').scrollTop = 0;
+  history.pushState({ jaDetail: true }, '');   // phone back button/gesture closes the sheet
+}
+function _hideMobileDetail() { document.body.classList.remove('detail-open'); }
+function closeMobileDetail() {
+  if (history.state && history.state.jaDetail) history.back();   // popstate hides it
+  else _hideMobileDetail();
+}
+window.addEventListener('popstate', _hideMobileDetail);
+_mobileQuery.addEventListener('change', e => { if (!e.matches) _hideMobileDetail(); });
+
 function closeDetail() {
+  if (document.body.classList.contains('detail-open')) closeMobileDetail();
   document.getElementById('companyPanel').innerHTML = `
     <div class="company-empty">
       <div class="icon">👆</div>
